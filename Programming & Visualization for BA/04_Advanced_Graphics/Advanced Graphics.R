@@ -34,12 +34,23 @@ ggplot(patents, aes(x=logtotal, color = densitycat)) +geom_boxplot()
 
 # 2
 data(msleep, package = 'ggplot2')
-colors <- c(A = "#333BFF", B = "#CC6600", C ="#9633FF", D = "#E2FF33", E = "#E3DB71")
+kleuren <- c()
 View(msleep)
-ggplot(msleep, aes(x=sleep_total,y=sleep_rem, shape = vore)) +geom_point(shape=15, size=2) + scale_shape_manual(1:3)
+ggplot(msleep, aes(x=sleep_total,y=sleep_rem, color = vore)) +geom_point(shape=15, size=2)  + scale_color_manual(values=c('red','blue','green','yellow'))
+
+
+
 #manueel shape en kleur classificaties meegeven door +... daarnaast kun je missende negeren, dit doe je door na.translate = FALSE
 # + scale_color_manual(values=colors)
+#ipv manuele kleurkeuze zou je een numerieke variabele willen classificeren op kleur, hier kun je scale_color_coninuous voor gebruiken
+#scale_xxx_continuous(), rood naar wit naar groen is een logische schaling
 
+# for some plots, legends are unnecessary. Inside the brackets you can do show.legend = FALSE
 
+# Flipping coordinates + coord_flip()
+# Printer-friendly coordinates with themes. + theme_minimal() do ? for extra information. ow_theme <- theme([args])
+# Limieten y en x as door ylim() en xlim(), xlabel(), ylabel()
+
+# Layers toevoegen met het plusteken. +geom_smooth(method="LM", show.legend = FALSE), +geom_hline( aes(yintercept = 0.04), size=2, linetype='dashed')
 
 
