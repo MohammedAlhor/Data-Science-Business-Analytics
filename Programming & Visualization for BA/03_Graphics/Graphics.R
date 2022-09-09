@@ -32,5 +32,14 @@ ggplot(storms, aes(x=status)) + geom_bar()
 data(economics, package = 'ggplot2')
 
 ggplot(economics, aes(x= date, y = unemploy)) + geom_line()
-asdasdfasa
+
+
+#setwd("~/Documents/Data-Science-Business-Analytics/Data")
+#### Importeren dataset
+patents <- readRDS("~/Documents/Data-Science-Business-Analytics/Data/patents.Rds")
+
+#scatterplot
+ggplot(patents, aes(x= total, y = density)) + geom_point()
+
+
 
