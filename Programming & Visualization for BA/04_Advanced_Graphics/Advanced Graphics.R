@@ -14,7 +14,7 @@ ggplot(storms, aes(x= wind, y = pressure, color = status)) + geom_point(shape =1
 
 
 #eredivisie
-ggplot(eredivisie, aes(x=Year, y = Points, color = density) + geom_line()
+ggplot(eredivisie, aes(x=Year, y = Points, color = density)) + geom_line()
  
 
 # Exercises Patent Data
@@ -36,9 +36,26 @@ ggplot(patents, aes(x=logtotal, color = densitycat)) +geom_boxplot()
 data(msleep, package = 'ggplot2')
 kleuren <- c()
 View(msleep)
-ggplot(msleep, aes(x=sleep_total,y=sleep_rem, color = vore)) +geom_point(shape=15, size=2)  + scale_color_manual(values=c('red','blue','green','yellow'))
+ggplot(msleep, aes(x=sleep_total,y=sleep_rem, color = vore)) +geom_point(shape=15, size=2)  + scale_color_manual(values=c('red','blue','green','yellow'), na.translate=FALSE)
+ggplot(msleep, aes(x=sleep_total,y=sleep_rem, color = vore)) +geom_point(shape=15, size=2)
+#niet echt een groot verschil in de leesbaarheid, fellere kleuren.
 
+#printer friendly
+ggplot(msleep, aes(x=sleep_total,y=sleep_rem, color = vore)) +geom_point(shape=15, size=2) + 
+  scale_color_manual(values=c('red','blue','green','yellow'), na.translate=FALSE) + theme_minimal()
 
+library(dplyr)
+breaks <- seq(0, 20, by = 5)
+msleep <- mutate(msleep, sleep_cut = cut(sleep_total, breaks))
+
+ggplot(msleep, aes(x=vore, fill = sleep_cut)) +geom_bar() + 
+  scale_fill_manual(values=c('red','blue','green','yellow'), na.translate=FALSE) + 
+  scale_x_discrete(na.translate=FALSE) + coord_flip() +xlab('Type') +ylab('Frequency')
+
+ggplot(msleep, aes(x=vore, fill = sleep_cut)) +geom_bar() + 
+  scale_fill_manual(values=c('red','blue','green','yellow'), na.translate=FALSE) + 
+  scale_x_discrete(na.translate=FALSE) +
+  ?geom_bar
 
 #manueel shape en kleur classificaties meegeven door +... daarnaast kun je missende negeren, dit doe je door na.translate = FALSE
 # + scale_color_manual(values=colors)
