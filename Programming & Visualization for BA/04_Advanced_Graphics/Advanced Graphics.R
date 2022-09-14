@@ -1,6 +1,7 @@
 # filteren van data
-install.packages('dplyr')
+# install.packages('dplyr')
 library(dplyr)
+library(ggplot2)
 data(storms, package = 'dplyr')
 #inladen data
 eredivisie <- readRDS("~/Documents/Data-Science-Business-Analytics/Data/eredivisie.Rds")
@@ -34,15 +35,17 @@ ggplot(patents, aes(x=logtotal, color = densitycat)) +geom_boxplot()
 
 # 2
 data(msleep, package = 'ggplot2')
-kleuren <- c()
+kleuren <- c('red','blue','green','yellow')
 View(msleep)
-ggplot(msleep, aes(x=sleep_total,y=sleep_rem, color = vore)) +geom_point(shape=15, size=2)  + scale_color_manual(values=c('red','blue','green','yellow'), na.translate=FALSE)
 ggplot(msleep, aes(x=sleep_total,y=sleep_rem, color = vore)) +geom_point(shape=15, size=2)
+ggplot(msleep, aes(x=sleep_total,y=sleep_rem, color = vore)) +geom_point(shape=15, size=2)  + scale_color_manual(values=kleuren, na.translate=FALSE)
+
 #niet echt een groot verschil in de leesbaarheid, fellere kleuren.
 
 #printer friendly
-ggplot(msleep, aes(x=sleep_total,y=sleep_rem, color = vore)) +geom_point(shape=15, size=2) + 
-  scale_color_manual(values=c('red','blue','green','yellow'), na.translate=FALSE) + theme_minimal()
+ggplot(msleep, aes(x=sleep_total,y=sleep_rem, color = vore)) +geom_point(shape=15, size=2)  +
+  scale_color_manual(values=kleuren, na.translate=FALSE) + 
+  theme_minimal()
 
 library(dplyr)
 breaks <- seq(0, 20, by = 5)
@@ -50,12 +53,17 @@ msleep <- mutate(msleep, sleep_cut = cut(sleep_total, breaks))
 
 ggplot(msleep, aes(x=vore, fill = sleep_cut)) +geom_bar() + 
   scale_fill_manual(values=c('red','blue','green','yellow'), na.translate=FALSE) + 
-  scale_x_discrete(na.translate=FALSE) + coord_flip() +xlab('Type') +ylab('Frequency')
+  scale_x_discrete(na.translate=FALSE) 
 
 ggplot(msleep, aes(x=vore, fill = sleep_cut)) +geom_bar() + 
   scale_fill_manual(values=c('red','blue','green','yellow'), na.translate=FALSE) + 
-  scale_x_discrete(na.translate=FALSE) +
-  ?geom_bar
+  scale_x_discrete(na.translate=FALSE) + coord_flip() +xlab('Type') +ylab('Frequency')
+
+?geom_bar
+
+ggplot(msleep, aes(x=vore, fill = sleep_cut)) +geom_bar() + 
+  scale_fill_manual(values=c('red','blue','green','yellow'), na.translate=FALSE) + 
+  scale_x_discrete(na.translate=FALSE) 
 
 #manueel shape en kleur classificaties meegeven door +... daarnaast kun je missende negeren, dit doe je door na.translate = FALSE
 # + scale_color_manual(values=colors)
@@ -70,4 +78,39 @@ ggplot(msleep, aes(x=vore, fill = sleep_cut)) +geom_bar() +
 
 # Layers toevoegen met het plusteken. +geom_smooth(method="LM", show.legend = FALSE), +geom_hline( aes(yintercept = 0.04), size=2, linetype='dashed')
 
+# 3
 
+ggplot(patents, aes(logdensity)) + 
+         geom_boxplot() +
+         ylab("Logarithm of population density") +
+         xlab("")
+?geom_boxplot
+
+ggplot(patents, aes(x=logtotal, y=logdensity)) + geom_point() + geom_vline(xintercept = c(0.52,6.8))
+
+ggplot(patents, aes(x=logtotal, y=logdensity)) + geom_point() + geom_vline(xintercept = c(0.52,6.8)) + 
+  ylab("Logarithm for pop dens") + 
+  xlab("Logarithm total number of patents")
+
+ggplot(patents, aes(x=logtotal, y=logdensity)) + geom_point() + geom_vline(xintercept = c(0.52,6.8)) + 
+  ylab("Logarithm for pop dens") + 
+  xlab("Logarithm total number of patents") + geom_smooth(method=lm)
+
+
+ggplot(patents, aes(x=logtotal, y=logdensity)) + geom_point() + geom_vline(xintercept = c(0.52,6.8)) + 
+  ylab("Logarithm for pop dens") + 
+  xlab("Logarithm total number of patents") + geom_smooth(method=lm, color = "red")
+
+
+
+#4
+vwgolf <- readRDS("~/Data-Science-Business-Analytics/Data/vwgolf.Rds")
+View(vwgolf)
+ggplot(vwgolf, aes(x=vwgolf$PriceNew, y=vwgolf$AskingPrice, color = vwgolf$Mileage, size = vwgolf$TopSpeed)) + 
+  geom_point() + 
+  scale_color_continuous(low='white', high ='red') + 
+  ylab("Asking price (euro)") + 
+  xlab("New price (euro)") +
+  labs(title = "Asking Price versus New Price", subtitle = "56 second-hand VW Golfs from Marktplaats.nl")
+
+?labs()
