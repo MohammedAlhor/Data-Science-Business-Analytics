@@ -7,6 +7,7 @@ data(storms, package = 'dplyr')
 eredivisie <- readRDS("~/Documents/Data-Science-Business-Analytics/Data/eredivisie.Rds")
 
 #les opdrachten
+# Exercise 1
 ggplot(storms, aes(x= wind, y = pressure)) + geom_point(color='red',shape =10, size = 3)
 #line types, fill, shape,
 ggplot(eredivisie, aes(x= status, y = wind)) + geom_boxplot()
@@ -104,7 +105,7 @@ ggplot(patents, aes(x=logtotal, y=logdensity)) + geom_point() + geom_vline(xinte
 
 
 #4
-vwgolf <- readRDS("~/Data-Science-Business-Analytics/Data/vwgolf.Rds")
+vwgolf <- readRDS("~/Documents/Data-Science-Business-Analytics/Data/vwgolf.Rds")
 View(vwgolf)
 ggplot(vwgolf, aes(x=vwgolf$PriceNew, y=vwgolf$AskingPrice, color = vwgolf$Mileage, size = vwgolf$TopSpeed)) + 
   geom_point() + 

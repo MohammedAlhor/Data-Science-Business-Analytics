@@ -1,0 +1,42 @@
+---
+title: "Data Wrangling"
+output: html_notebook
+---
+
+Data wrangling or manipulation is crucial.
+
+Software requirements 
+New york city flight information, use the packages nycflights13 and tidyverse. Take note that some dplyr statements are also included in the stats package. Filter and lag for example. Specify which one you use.
+
+Basic functions in data transformation (dplyr)
+filter()  eruit filteren van rows 
+arrange() sorteren
+select()  selecteren 
+mutate()  mutate or add new variables
+summarise() make a summary over the data
+
+First argument is always the data set, the next arguments are the things you want to do with the data. 
+
+
+Filter kent verschillende operators.
+%in% c(10:12)
+Stringr
+
+Arrange()
+
+Select()  carrier:dest, -(year:day), (year, date, everything())
+Use contains('time') to select variables with time in it.
+starts_with
+ends_with
+one_of
+?dplyr_tidy_select
+Gebruik ignore case om case sensitivity te negeren.
+
+Mutate() mutate or add new variables
+
+
+Summrarise()
+
+
+
+
