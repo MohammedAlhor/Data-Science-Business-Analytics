@@ -36,7 +36,16 @@ Mutate() mutate or add new variables
 
 
 Summrarise()
+drop_last argument is interessant als je groepen hebt met 1 rij.
 
+
+Gebruik pipes!!
+
+across() functie kun je geruiken om een berekning te doen over meerdere variabelen, gebruikt bij summarise en mutate
+2 args, .cols, .fns
+.clos kun je dus c() doen, maar ook everything(), ook starts_ith(), where(is.numeric/is.character)
+
+Ook kun je in de across een lijst aan functies meegeven, om bijvoorbeeld mean en mediaan tegelijkertijd uit te rekenen.
 
 
 

@@ -59,5 +59,13 @@ flights_summ2 <- summarise(flights_group2,
                            sd = sd(air_time, na.rm=TRUE))
 ?summarise()
 
+# Exercise 6 
 
+?lag
+flights_group_orig <- group_by(flights, origin)
+
+flights_lag <- group_by(flights, origin) %>%
+  arrange(dep_time, .by_group = TRUE )
+  (flights_group3, dep_delay_lag = lag(dep_delay,n=1))
+?arrange()
                           
