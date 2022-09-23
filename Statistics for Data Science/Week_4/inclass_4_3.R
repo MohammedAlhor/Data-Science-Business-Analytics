@@ -1,23 +1,20 @@
 # import housing data
-load("~/Documents/Data-Science-Business-Analytics/Data/houseprice.RData")
+dataset <- as.data.frame(state.x77)
 library(ggplot2)
+library(effects)
 
-lm <- lm(price ~ lotsize, data=houseprice)
+lm <- lm(Murder ~ Income + Population + Income:Population, data=dataset)
 
+summary(dataset)
 summary(lm)
 
-# The R squared is 0.2871 , R^2 = 1-(SSE/SSY), ssy is larger than sse
-# verklaart 28 % van de variatie
-attributes(lm)
-attributes(summary(lm))
+plot(lm)
 
-# H0: B = 0, Ha: B !=0
-# H0 can be rejected, b is >0 and statistically significant
-cor.test(houseprice$price, houseprice$lotsize)
+sct <- ggplot(dataset, aes(x=Murder, y=Population*Income)) + geom_point()
+sct
 
+m<- lm(Murder ~ Population*Income, data= dataset)
+summary(m)
+plot(effect("Population:Income", m), multiline = TRUE)
 
-lm_log <- lm(log(price) ~ log(lotsize), data =houseprice)
-summary(lm_log)
-# When x increases by 1 percent, y increases bij B*1%
-
-plot(log(houseprice$price), log(houseprice$lotsize))
+table(dataset$Income)
