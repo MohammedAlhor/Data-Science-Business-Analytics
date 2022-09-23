@@ -186,7 +186,18 @@ flights_summ <- summarise(flights_group,
 pivot_example <-readRDS("~/Documents/Data-Science-Business-Analytics/Data/pivot_example.Rds")
 
 pivot_long <- pivot_example %>%
-  pivot_longer(cols=)
+  pivot_longer(cols = c('female_married', 'male_married'),
+               names_to = 'Marrital',
+               values_to = 'Amount')
+?pivot_longer
+
+
+
+
+
+
+
+
 
 
 table_gathered <- table4a %>%
