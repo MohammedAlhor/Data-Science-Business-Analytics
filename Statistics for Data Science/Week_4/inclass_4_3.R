@@ -10,6 +10,7 @@ summary(lm)
 
 plot(lm)
 
+
 sct <- ggplot(dataset, aes(x=Murder, y=Population*Income)) + geom_point()
 sct
 

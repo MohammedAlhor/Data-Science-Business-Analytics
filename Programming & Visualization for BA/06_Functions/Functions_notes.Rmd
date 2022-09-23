@@ -1,0 +1,10 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+Pipes kunnen worden gebruikt om functies functies te combineren zonder te tussenstappen op te slaan. 
+across() 
+Je kunt geparametriseerd attributen voeden aan een functie in de across functie. across( c([],[]), ~mean(., na.rm=TRUE))
+
+-- Joining Dataframes
+#sqldf in R

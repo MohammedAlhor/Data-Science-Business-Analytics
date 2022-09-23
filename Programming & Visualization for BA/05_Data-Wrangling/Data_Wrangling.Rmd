@@ -47,5 +47,8 @@ across() functie kun je geruiken om een berekning te doen over meerdere variabel
 
 Ook kun je in de across een lijst aan functies meegeven, om bijvoorbeeld mean en mediaan tegelijkertijd uit te rekenen.
 
+#tidy data
+
+From wide to long format
 
 
