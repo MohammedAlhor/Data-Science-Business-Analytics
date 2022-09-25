@@ -18,6 +18,7 @@ library(ggplot2)
 summary(college_statistics$Enroll)
 sum(is.na(college_statistics$Enroll))
 ggplot(college_statistics, aes(x=Enroll, color = Private)) + geom_boxplot()
+ggplot(college_statistics, aes(x=Enroll, color = Private)) + geom_boxplot()
 
 
 # (b) Hoe ziet de verdeling eruit van het acceptatiepercentage? Wat is het accepta-
@@ -28,7 +29,7 @@ sum(is.na(college_statistics$Accept))
 college_statistics$Acc_perc <- (college_statistics$Accept/college_statistics$Apps)*100
 hist(college_statistics$Acc_perc)
 ggplot(college_statistics, aes(x=Acc_perc)) + geom_histogram(binwidth = 10)
-# The distribution of acceptannce percentage looks to be negatively skewed.
+# The distribution of acceptance percentage looks to be negatively skewed.
 college_statistics[which.min(college_statistics$Acc_perc),]
 # The school with the lowest acceptance rate seems to be Princeton.
 
@@ -55,22 +56,31 @@ plot(college_statistics$Acc_perc, college_statistics$Books)
 # The same goes for the price of books. This is to be expected, the price of books shouldn't vary that much by school
 college_statistics$total_cost <- college_statistics$Outstate + college_statistics$Room.Board
 
-ggplot(college_statistics, aes(x=Acc_perc, y=total_cost, color =Private)) + 
+ggplot(college_statistics, aes(x=Acc_perc, y=total_cost)) + 
   geom_point() + 
   ylab("Total cost") + 
   xlab("Acceptance Rate") +
-  labs(title = "Total costs vs. Accepance rate")
+  labs(title = "Total costs vs. Accepance rate") + 
+  geom_smooth(method='lm')
 
 ## (d) Bedenk zelf een extra vraag en cre¨eer een geschikte figuur om deze vraag mee
 ## te beantwoorden.
 # Hebben duurdere universeiten een hoger percentage aan afgestudeerden die geld doneren? 
 # Bekijk ook het verschil tussen private en publieke universiteiten.
 summary(college_statistics$perc.alumni)
-ggplot(college_statistics, aes(x=perc.alumni, y=total_cost, color =Private, size = perc.alumni)) + 
+ggplot(college_statistics, aes(x=total_cost, y=perc.alumni)) + 
   geom_point() + 
-  ylab("Total Cost") + 
-  xlab("Percent alums who donate") +
-  labs(title = "Total costs vs. Accepance rate")
+  ylab("Percentage alumni donations") + 
+  xlab("Total Cost") + 
+  labs(title = "Alumni donations vs. Total costs")+ 
+  geom_smooth(method='lm')
+
+ggplot(college_statistics, aes(x=total_cost, y=perc.alumni, color =Private)) + 
+  geom_point() + 
+  ylab("Percentage alumni donations") + 
+  xlab("Total Cost") + 
+  labs(title = "Alumni donations vs. Total costs", subtitle = 'Private vs. Public schools')+ 
+  geom_smooth(method = 'lm')
 
 # 3 (a) Ontvangen elite scholen een ander aantal aanmeldingen in vergelijking met niet-
 #     elite scholen? Definieer “elite-school” als scholen waarvoor geldt dat meer dan
@@ -78,8 +88,12 @@ ggplot(college_statistics, aes(x=perc.alumni, y=total_cost, color =Private, size
 elite <- subset(college_statistics, Top10perc > 50)
 not_elite <- subset(college_statistics, Top10perc <= 50)
 hist(elite$Apps)
-# not normally distributed
 hist(not_elite$Apps)
+# not normally distributed
+shapiro.test(elite$Apps)
+shapiro.test(not_elite$Apps)
+# not normally distributed for bot elite and non elite schools
+
 var(elite$Apps)
 var(not_elite$Apps)
 sd(elite$Apps)
@@ -93,14 +107,38 @@ var.test(elite$Apps,not_elite$Apps, alternative=c("two.sided","less","greater"))
 # unequal variance
 mean(elite$Apps)
 mean(not_elite$Apps)
-# H0 : μelite = μnot_elite Ha: Ha : μelite != μnot_elite
-t.test(elite$Apps, not_elite$Apps, var.equal = FALSE)
 
-# We can reject the null hypothesis, the mean of applications for elite schools is statistically different from not elite schools.
-# Note that the confidence interval is between 2148 and 4474, the mean of elite schools (5980) is well outside that range.
+wilcox.test(elite$Apps, not_elite$Apps, alternative=c("two.sided","less","greater"))
 
-plot(college_statistics$Acc_perc, college_statistics$Grad.Rate)
-cor.test(college_statistics$Acc_perc, college_statistics$Grad.Rate)
+# (b) Is er een verband tussen acceptance rate en graduation rate?
 
-plot(college_statistics$Personal, college_statistics$Grad.Rate)
-cor.test(college_statistics$Personal, college_statistics$Grad.Rate)
+college_statistics_b <- college_statistics[college_statistics$Grad.Rate <= 100,]
+
+ggplot(college_statistics_b, aes(x=Acc_perc, y=Grad.Rate)) + 
+  geom_point() + 
+  ylab("Acceptance Rate") + 
+  xlab("Graduation Rate") + 
+  labs(title = "Acceptance Rate vs. Gradutation Rate")+ 
+  geom_smooth(method = 'lm')
+
+
+shapiro.test(college_statistics_b$Acc_perc)
+shapiro.test(college_statistics_b$Grad.Rate)
+
+cor.test(college_statistics_b$Acc_perc, college_statistics_b$Grad.Rate, method = 'kendall')
+
+
+# (c) Bedenk zelf ook een extra hypothese om te toetsen en voer de hypothesetoets
+# uit.
+# Is er een verband tussen persoonlijke uitgaven van studenten en de graduation rate?
+ggplot(college_statistics_b, aes(x=Personal, y=Grad.Rate)) + 
+  geom_point()  + 
+  xlab("Personal Spending") + 
+  ylab("Graduation Rate") + 
+  labs(title = "Personal spending vs. Gradutation Rate")+ 
+  geom_smooth(method = 'lm')
+
+shapiro.test(college_statistics_b$Personal)
+shapiro.test(college_statistics_b$Grad.Rate)
+
+cor.test(college_statistics_b$Personal, college_statistics_b$Grad.Rate, method = 'kendall')

@@ -1,0 +1,227 @@
+---
+title: "Eindopdracht Deel 1"
+author: "Mohammed Al Hor"
+date: "2022-09-25"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+1. Lees de data in als dataframe en zorg ervoor dat de eerste kolom als label voor de rijen wordt gebruikt. Hint: zie ?row.names.
+  
+```{r}
+setwd("~/Data-Science-Business-Analytics/Data")
+college_statistics <- read.csv("college_statistics.csv", header = TRUE)
+rownames(college_statistics) <- college_statistics[,1]
+college_statistics <- college_statistics[,-1]
+```
+
+The data is loaded in as a csv file with header, labels are set via rownames as the first column. Finally, the first column 'X' is dropped.
+
+2. Voer beschrijvende statistiek uit dmv. het maken van een aantal grafieken. Deze
+   grafieken mag je via de “Base R graphics” of mbv. ggplot maken.
+   Creeer geschikte grafieken om de volgende vragen te beantwoorden:
+
+(a) Zijn private universiteiten overwegend kleiner of groter dan publieke universiteiten? Je mag zelf een definitie voor groot/klein definieren.
+
+```{r, echo=FALSE}
+library(ggplot2)
+ggplot(college_statistics, aes(x=Enroll, color = Private)) + geom_boxplot()
+```
+
+The median or mid-point of the data for private schools is lower, so is the inter-quartile range (the middle box that represents 50% of the observations). These boxplots would suggest that private schools have fewer enrolled students. However, to say this with reasonable certainty a statistical test on the mean must be done (private school observations obviously contain a significant amount of outliers). 
+
+(b) Hoe ziet de verdeling eruit van het acceptatiepercentage? Wat is het accepta-
+tiepercentage voor de meest selectieve universiteit?
+
+First off, we check for missing values in 'Accept' and 'Apps'. No missing values. To calculate the acceptance rate we must divide the number of accepted students by the number of applicants. To get a percentage we multiply by 100. 
+```{r}
+college_statistics$Acc_perc <- (college_statistics$Accept/college_statistics$Apps)*100
+```
+To get a feeling for the distribution we generate a histogram for this new variable.
+```{r, echo=FALSE}
+hist(college_statistics$Acc_perc)
+```
+
+The distribution is negatively skewed (tail to the left).
+
+To get the lowest acceptance rate for a school we run the following statement:
+```{r}
+college_statistics[which.min(college_statistics$Acc_perc),]
+```
+
+Princeton University is the school with the lowest acceptance rate.
+
+(c) Zijn de meer selectieve universiteiten ook overwegend duurder dan minder selec-
+tieve universiteiten? (Je mag zelf bepalen welke kosten je wel/niet mee neemt.)
+
+To get this answer we must do some feature engineering. Which costs should we take into account? To do this, we take a look at histograms, summary stats and some quick plots of the different cost variables (Outstate, Room.Board, Personal and Books). We pick 'Outstate' and 'Room.Board' to use in our 'cost' variable. Mainly because we do not see any relationship bewteen Personal spending, the cost of books and the acceptance rate. This is explained in the inline comments in the added R script. 
+Thus, to calculate the total cost we run the following statement:
+```{r}
+college_statistics$total_cost <- college_statistics$Outstate + college_statistics$Room.Board
+```
+
+To answer the question we plot the total costs and acceptance rate using the ggplot package.
+
+```{r, echo=FALSE}
+ggplot(college_statistics, aes(x=Acc_perc, y=total_cost)) + geom_point() + ylab("Total cost") + xlab("Acceptance Rate") +labs(title = "Total costs vs. Accepance rate") + geom_smooth(method='lm')
+```
+
+Looking at this plot we see a negative relationship between the cost and the acceptance rate. The more selective schools seem to be more expensive than the less selective schools.
+
+(d) Bedenk zelf een extra vraag en creeer een geschikte figuur om deze vraag mee te beantwoorden.
+Hebben duurdere universeiten een hoger percentage aan afgestudeerden die geld doneren? Bekijk ook het verschil tussen private en publieke universiteiten.
+
+```{r, echo=FALSE}
+ggplot(college_statistics, aes(x=total_cost, y=perc.alumni)) + geom_point() + ylab("Percentage alumni donations") + xlab("Total Cost") + labs(title = "Alumni donations vs. Total costs")+ geom_smooth(method='lm')
+```
+
+This plot shows a positive relationship between costs and the percentage of alumnis who donate to their alma mater. This makes sense, the more affluent students who go to these schools probably have more disposable income to donate.
+
+Let's take a look at this relationship with taking into account whether it's a private or public school.
+
+
+```{r, echo=FALSE}
+ggplot(college_statistics, aes(x=total_cost, y=perc.alumni, color =Private)) + geom_point() + ylab("Percentage alumni donations") + xlab("Total Cost") + labs(title = "Alumni donations vs. Total costs", subtitle = 'Private vs. Public schools')+ geom_smooth(method = 'lm')
+```
+
+This plot shows that alums who when to private schools, which were more expensive, tend to donate more (positive relationship between costs and perc of alums who donate). We don't see the same 'strong' positive relationship for students who went to public schools. In short, students who went to private schools tend to donate more often, the more expensive a school is.
+
+3. Voer hypothesetoetsen uit om de volgende vragen te beantwoorden. Geef telkens
+duidelijk aan wat de exacte nul- en alternatieve hypothese is die je toetst, motiveer
+de keuze van de specifieke toets en verwoord duidelijk de conclusie.
+
+(a) Ontvangen elite scholen een ander aantal aanmeldingen in vergelijking met niet-
+elite scholen? Definieer “elite-school” als scholen waarvoor geldt dat meer dan
+50% van de studenten tot de top 10% van hun high school behoort.
+
+To answer this question we first get a subset of the data, schools with > 50% in the top10 and schools <= 50% in the top10. We name them elite and not_elite, respectively.
+
+```{r}
+elite <- subset(college_statistics, Top10perc > 50)
+not_elite <- subset(college_statistics, Top10perc <= 50)
+```
+
+To compare the means of two groups a widely used method is the t-test. The t-test does make some assumptions about the data (independent, normality, and similar amount of variance). Let's check for this. Because the data concerns separate schools we can assume independency. For normality we first look at the histograms.
+
+```{r}
+hist(elite$Apps)
+hist(not_elite$Apps)
+```
+
+It is obvious from the histograms that the data is not normally distributed (I don't want to overload you with every plot I make in R, so I chose not to show these). To make sure we can do a Shapiro-Wilk test for normality.
+
+```{r}
+shapiro.test(elite$Apps)
+shapiro.test(not_elite$Apps)
+```
+
+H0: elite$Apps is normally distributed
+Ha: elite$Apps is not normally distributed
+
+H0: not_elite$Apps is normally distributed
+Ha: not_elite$Apps is not normally distributed
+
+The results from both Shaprio-Wilk tests confirm our suscpicions. The null hypothesis can be rejected (p value is extremely small), thus the data for elite and non elite schools in not normally distributed. Now let's take a look at the variance.
+
+```{r}
+var(elite$Apps)
+var(not_elite$Apps)
+sd(elite$Apps)
+sd(not_elite$Apps)
+```
+
+At first glance the variances and standard deviations of elite vs. non elite schools' number of applications are quite different. Elite schools showing almost twice as much variance. Let's put this to the test, using a Fischer F test for variance.
+
+```{r}
+var.test(elite$Apps,not_elite$Apps, alternative=c("two.sided","less","greater"))
+```
+
+H0: varianceelite= variance-notelite
+Ha: elite$Apps is not normally distributed
+
+Our assumption about the variance seems to be true. We can reject the null hypothesis (very small p-value), and say the variance in number of applications for elite schools is statistically different from that of non elite schools.
+
+Finally, now that we know the data is not normally distributed and the variances are not similar we can pick the correct test. Note that in the beginning we mentioned the t-test to compare the means of two groups. Because of the normality and similar variance conditions of this test are not met, this might not be the the best method. Considering we have a decent sample size, we could get away with using the two sample t-test. However, I feel more comfortable using a non parametric test. The Wilcoxon Rank-Sum test is such a method.
+
+```{r}
+wilcox.test(elite$Apps, not_elite$Apps, alternative=c("two.sided","less","greater"))
+```
+
+H0: the 2 groups are equal in terms of number of applications
+Ha: the 2 groups are different in terms of number of applications
+
+The p-value is extremely small. Therefore, we can reject the null hypothesis at 1% level and conclude that the number of applications are significantly different for elite and non elite schools.
+
+(b) Is er een verband tussen acceptance rate en graduation rate?
+
+First, let's take a quick look at both variables.
+
+```{r}
+summary(college_statistics$Acc_perc)
+summary(college_statistics$Grad.Rate)
+```
+
+We immediately see that the variable 'Grad.Rate' has a max value of 118.00. This cannot be right, the graduation rate cannot be more than 100. We drop the observations with graduation rate larger than 100.
+
+```{r}
+college_statistics_b <- college_statistics[college_statistics$Grad.Rate <= 100,]
+```
+
+Now we can delve into the data further by making a quick plot using ggplot.
+
+```{r echo=FALSE}
+ggplot(college_statistics_b, aes(x=Acc_perc, y=Grad.Rate)) + geom_point() + ylab("Graduation Rate") + xlab("Acceptance Rate") + labs(title = "Acceptance Rate vs. Gradutation Rate")+ geom_smooth(method = 'lm')
+```
+
+The plots shows a negative relation between the acceptance rate and graduation rate. In other words, the more selective schools have higher graduation rates.
+
+Now, let's take a look at the distribution of the data. Do they follow a normal distribution? To do this, we use the Shapiro-Wilk test for normality.
+
+```{r}
+shapiro.test(college_statistics_b$Acc_perc)
+shapiro.test(college_statistics_b$Grad.Rate)
+```
+H0: Acc_perc/Grad.Rate is normally distributed
+Ha: Acc_perc/Grad.Rate is not normally distributed
+
+The p-values are very small. We can reject the null hypothesis at the 1% level and conclude that the data is not normally distributed. This affects the method we choose to test for correlation (we cannot use Pearson correlation, because of its assumption of normally distributed data). Instead, we use a non parametric test for correlation, the Kendall Rank correlation test or Kendall's tau.
+
+```{r}
+cor.test(college_statistics_b$Acc_perc, college_statistics_b$Grad.Rate, method = 'kendall')
+```
+H0: correlation is equal to 0
+Ha: correlation is not equal to 0
+
+The p-value is very small, we can reject the null hypothesis that correlation is equal to 0 and conclude that Acc_perc and Grad.Rate are negatively correlated with a correlation coefficient equal to -0.161. So, we find a correlation between the variables. However, we cannot say much about a causal relationship. We do not know if Acc_perc causes Grad.Rate and vice versa. More extensive modelling and replication is required to prove a causal relationship.
+
+
+(c) Bedenk zelf ook een extra hypothese om te toetsen en voer de hypothesetoets
+uit.
+Is er een verband tussen persoonlijke uitgaven van studenten en de graduation rate?
+
+```{r}
+ggplot(college_statistics_b, aes(x=Personal, y=Grad.Rate)) + geom_point()  + xlab("Personal Spending") + ylab("Graduation Rate") + labs(title = "Personal spending vs. Gradutation Rate")+ geom_smooth(method = 'lm')
+```
+
+The plots shows a negative relation between the graduation rate and personal spending. In other words, the schools with higher estimated spending have lower graduation rates. Lets put this to the test, but first let's check for normality.
+
+```{r}
+shapiro.test(college_statistics_b$Personal)
+shapiro.test(college_statistics_b$Grad.Rate)
+```
+H0: Personal/Grad.Rate is normally distributed
+Ha: Personal/Grad.Rate is not normally distributed
+
+We can reject the null hypothesis at the 1% level for bot variables. Therefore, we can conclude both variables are not normally distributed. Correlation between non normally distributed variables are best tested using the non parametric method (Kendall Rank correlation test)
+
+```{r}
+cor.test(college_statistics_b$Personal, college_statistics_b$Grad.Rate, method = 'kendall')
+```
+H0: correlation is equal to 0
+Ha: correlation is not equal to 0
+
+The p-value is very small, we can reject the null hypothesis that correlation is equal to 0 and conclude that personal speninding and the graduation rate are negatively correlated with a correlation coefficient equal to -0.195. Again, we cannot say much about a causal relationship, but there's definitely correlation between the variables.
