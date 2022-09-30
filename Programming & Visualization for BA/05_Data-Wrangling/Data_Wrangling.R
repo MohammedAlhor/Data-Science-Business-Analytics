@@ -193,17 +193,12 @@ pivot_long <- pivot_example %>%
 
 
 
-
-
-
-
-
-
-
 table_gathered <- table4a %>%
   pivot_longer(cols = c('1999','2000'), 
                names_to = 'Year',
                values_to = "Country")
+
+# Exercise 11
 
 
 

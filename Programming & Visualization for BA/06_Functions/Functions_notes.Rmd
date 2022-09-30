@@ -1,10 +1,22 @@
 ---
-title: "R Notebook"
+title: "Functions"
 output: html_notebook
 ---
-Pipes kunnen worden gebruikt om functies functies te combineren zonder te tussenstappen op te slaan. 
-across() 
-Je kunt geparametriseerd attributen voeden aan een functie in de across functie. across( c([],[]), ~mean(., na.rm=TRUE))
 
--- Joining Dataframes
-#sqldf in R
+Alles met een haakje zijn functies, tevens zijn de operator functions
+Functies nemen argumenten(objecten), doet een transformatie en geeft optioneel wat terug.
+Soms is het handig om zelf een functie te schrijven
+
+Functions are sperate pieces of code with a name. Readability & reusability are improved.
+Main script waarbij stukken worden gebruikt uit functies.
+A function has 0 or more input alues: arguments
+every function has onlu 1 output value: return value
+can also be null if no output is needed
+more than 1 output can be returned in a list()-object
+Every function does one thing
+write seperate functions for seperate tasks
+A function should be as genergic as poissible for reusability
+
+Je kunt variabelen gebruiken uit de parent environment, maar dit wordt niet aangeraden. Omdat de functie altijd hetzelfd antwoord zou moeten geven, ongeacht de data.
+
+years <<- 9  is een globable verandering
