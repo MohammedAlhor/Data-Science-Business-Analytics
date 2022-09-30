@@ -1,0 +1,112 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+normality test, shapiro wilk test of de jarque-bera toets voor skewness.
+qq plot kan ook gebruikt worden, deze zou linear moeten zijn.
+vergelijk geschatte cdf met theoretische cdf
+
+should be a straight line.
+quantielen tegenover elkaar zetten, theoretical op de x as en sample op de y as. 
+
+Basic model diagnostics
+Hoe beoordeel je of een model goed is?
+
+Checken of de aannames kloppen.
+A3 Linear verband
+A4 homoskedasticity
+A5 no autocorrelation
+A6 normality
+
+meerdere grafieken in een plaat kan handig zijn bij het plotten van verschillende grafieken
+par(mfrow=c(2,2))
+
+1. Plot of residuals vs fitted values: linearity
+-zit er strcutuur in het gemiddelde of absolute waarden
+2. QQ plot of standardized residuals. Normality
+- Check for deviatons 
+3. Plot of sqrt(abs(stand.residual)) vs fitted. Heteroskedasticity
+- check wheteher magnitude of residuals depend on fitted value
+4. Leverage (high if 'extreme in terms of x') vs standardized residuals: Outliers
+Hoe ver bij het gemiddelde zit je x vandaan
+
+Autocorrelatie van de residuen A5 kmt later op
+
+# Advanced diagnostics
+DGP: data generating proces
+IID check of model
+qqPlot from the 'car' package
+
+Autocorrelatie aanname: A5 geen correlatie tussen de errors. Storingstermen zijn onafhankelijk, niet gecorreleeerd.
+Why is testing independence needed? 
+- Independence is better justified by nature than a test
+- cross-sectional data judge by nature
+
+Durbin Watson test [A5], autocorrelation
+Cor(et, et-1) = 
+Use this for time series
+
+A3 Linearity
+More detailed checks:
+Componoent plus residual plots
+compare it to the observations
+
+crPlots(m)
+Reset test
+
+# Homoskedasticity. Zijn de residuen in absolute zin ongeveer even groot
+Standardized residuals vs fitted value
+Homoskedasticity kan getoetes worden met een Breush-Pagan test
+regress e^2 on the X
+Kwadraat van de residuals lijkt heel veel op de variantie. best approximation. Alle fouten in het kwadraat.
+H0 constant variances Ha non constant variances
+ncvTest(lm) non constant variance test. Zit in het car package
+
+Is niet meteen een groot probleem als dit niet opgaat.
+- does not cause bias in parameter estimates
+- does not lead to major problems with OLS
+- does lead to wrong standard errors, pwaarde t waardes zijn niet correct.
+-> Can reduce estimation uncertainty using weighted least squares
+
+We can estimate the correct variance
+packages sandwich and lmtest
+vcovHc()
+-> Heteroskedasticity Consistent covariance matrix
+coeftest(lm(y~x), vcov = vcocHC)
+
+A7: Multicolinearity
+Geen perfecte relatie binnen de verklarende variabelen
+Full collinearity model is not identified
+Close to full collinearity (multicollinearity) leads to very unstable estimate and insignificant coefficient.
+hoge stnadaarfouten niet significant, maar wel een hoge verklaring (R squared)
+
+How do we find this.
+Variance inflation factor
+- Regress one explanatory vvariable on th eothers 
+- R^2 van de regressie VIF = 1/1-R^2
+- variance inflation factor >4 is big.
+- De grootte van de dataset wordt hierin niet meegneomen, heb je hoge getallen dan zitten er sterke verbanden tussen je x variablen.
+
+Unusual observations:
+-Outlier: bad predciton
+- High leverage points: unusual independent variables
+- Influential observations: severely affect model estimatse.
+Difference and relations
+- High-leerage points are not determined by the dependent ariable
+- Outliers nand high leverage points are unrelated
+- Influential observations are a combination of oiutlier an dhigh leverage pints.
+
+Outlier detection
+QQ plot
+Test in a formal way. t-test on the largest studentized residual?
+some correction on the p-value is needed!
+-> Bonferroni correction
+outlierTest(fit) onderdeel van car package
+
+High leverage points
+- unusual 
+
+

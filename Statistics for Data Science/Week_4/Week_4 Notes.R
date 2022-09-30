@@ -23,3 +23,5 @@
 
 
 # visualizing interaction effects are best done with the package effects. plots interaction beta's.
+
+# Gebruik AIC waardes om modellen met elkaar te vergelijken. AIC(step1, step 2)
