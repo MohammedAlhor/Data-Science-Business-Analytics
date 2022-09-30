@@ -11,7 +11,7 @@ my_function <- function(param1)
 
 my_function(2)
 # b
-#Unused argument melding if param2 was in my global variable
+#Unused argument melding if param2 was in my global ArgVar
 
 # c
 #26
@@ -37,31 +37,17 @@ my_function2(2,3)
 
 #3
 #a
-data("mtcars")
 mtcars %>% group_by(cyl) %>% summarise(group_count = n())
 mtcars %>% group_by(carb) %>% summarise(group_count = n())
-
-my_function_mt <- function(group)
-{
-  mtcars %>% group_by({{group}}) %>% summarise(group_count = n())
-}
-my_function_mt(carb)
-
+data("mtcars")
+data(storms, package='dplyr')
 data("starwars")
-my_function_starwars <- function(group)
+my_function_all <- function(df,group)
 {
-  starwars %>% group_by({{group}}) %>% summarise(group_count = n())
+  {{df}} %>% group_by({{group}}) %>% summarise(group_count = n())
 }
 my_function_starwars(homeworld)
-
-data(storms, package='dplyr')
-
-my_function_storms <- function(group)
-{
-  storms %>% group_by({{group}}) %>% summarise(group_count = n())
-}
-
-my_function_storms(year)
+my_function_all(storms,year)
 
 
 # 4
@@ -78,17 +64,19 @@ animal_species %>%
             missing = sum(!is.na(weight))
             )
 
-get_group_stats <- function(df, group, variable)
+get_group_stats <- function(df, group, ArgVar)
 {
    {{df}} %>% 
     group_by({{group}}) %>%
-    summarise(average = mean({{variable}}, na.rm = TRUE), 
-              sd = sd({{variable}}, na.rm = TRUE),
-              q25 = quantile({{variable}}, probs = 0.25, na.rm=TRUE),
-              q75 = quantile({{variable}}, probs = 0.75, na.rm=TRUE),
-              missing = sum(!is.na({{variable}})))
+    summarise(average = mean({{ArgVar}}, na.rm = TRUE), 
+              sd = sd({{ArgVar}}, na.rm = TRUE),
+              q25 = quantile({{ArgVar}}, probs = 0.25, na.rm=TRUE),
+              q75 = quantile({{ArgVar}}, probs = 0.75, na.rm=TRUE),
+              missing = sum(!is.na({{ArgVar}})))
 }
-
 get_group_stats(animal_species,1989, weight)
 get_group_stats(animal_species,taxa, hindfoot_length)
-get_group_stats(animal_species,genus, weight)
+ony<-get_group_stats(animal_species,genus, weight)
+
+# lapply
+
