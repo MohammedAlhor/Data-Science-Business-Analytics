@@ -40,41 +40,48 @@
 #### Q1 - introduction and descriptives ----
 # a)
 # Load the tidyverse-package.
-
+library(tidyverse)
 
 # b)
 # Read the data from 'oecd_data.csv'.
-
-
+setwd("~/Documents/Data-Science-Business-Analytics/Data")
+oecd_data <- read_csv("oecd_data.csv")
 # c)
 # Get a first view on the data by getting the dimensions, show the first 5 rows of
 # the data.frame and giving the summary. 
-
-
+dim(oecd_data)
+head(oecd_data,n=5)
+summary(oecd_data)
 # d)
 # Use the standard plot-function from R (not ggplot()) that get a first visual view
 # on the data.
-
+plot(oecd_data)
 
 # e)
 # How many observations are there by country, by year? Show it in a table.
-
-
+table(oecd_data$country_code) 
+table(oecd_data$year)
 
 #### Q2 - dplyr-preparations + first visualizations ----
 # a)
 # To get to our first visualizations, filter only the observations for UK.
-
+oecd_uk <- oecd_data[oecd_data$country_code=='UK',]
 
 # b)
 # Group the observations in the dataset from Q2a) by year and get the minimum and
 # maximum of pc_real_ppp in the UK.
-
-
+library(dplyr)
+uk_grouped <- oecd_uk %>% 
+              group_by(year) %>%
+              summarise(minimum = min(pc_real_ppp), maximum = max(pc_real_ppp))
 # c)
 # Show in a time series plot the minimum and maximum of pc_real_ppp in the UK over 
 # time.
-
+library(ggplot2)
+pc_real_ppp_plot <- ggplot(uk_grouped, aes(x=year)) + 
+                             geom_line(aes(y=minimum), color = 'red') +
+                             geom_line(aes(y=maximum), color = 'blue') +
+                             
 
 
 #### Q3 - data wrangling ----
@@ -82,6 +89,7 @@
 # Back to our original dataset, loaded in Q1b). Get for each country in 2015 the 
 # name of the region with the largest pc_real_ppp.
 
+oecd_data %>% filter(year==2015) %>% group_by(country_code,) %>% summarise(max(pc_real_ppp))
 
 # b) 
 # (Again use the dataset loaded in Q1b) We need to scale the data such that countries 
