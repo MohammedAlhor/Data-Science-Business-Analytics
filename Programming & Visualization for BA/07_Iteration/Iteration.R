@@ -55,3 +55,21 @@ fibonacci_func <- function(length)
  }
 }
 
+
+# opdracht 5
+install.packages("tidyverse")
+library(tidyverse)
+data('starwars')
+starwars_list <- starwars %>%
+  transpose() %>%
+  setNames(starwars$name)
+
+get_movies <- function(data, character) {
+  map_chr(data, )
+}
+
+
+# Opdracht 6
+get_tidy_movies <- function(){
+  
+}
