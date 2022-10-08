@@ -1,0 +1,221 @@
+---
+title: "Assignment_01"
+author: "Mohammed Al Hor"
+date: "2022-10-08"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### Questions ----
+
+
+#### Q1 - introduction and descriptives ----
+a)
+Load the tidyverse-package.
+
+```{r}
+library(tidyverse)
+```
+
+b)
+Read the data from 'oecd_data.csv'.
+```{r}
+# Set our working directory
+setwd("~/Data-Science-Business-Analytics/Data")
+# Load our csv file with headers
+oecd_data <- read.csv("oecd_data.csv", header = TRUE)
+```
+
+c)
+Get a first view on the data by getting the dimensions, show the first 5 rows of the data.frame and giving the summary. 
+
+To get the dimensions of a dataset we use the dim() function:
+```{r}
+dim(oecd_data)
+# Dimensions are 15168 rows, 7 columns
+```
+
+To show the first 5 rows we use the head() function with n = 5
+```{r}
+head(oecd_data,n=5)
+```
+
+To get summary of the data we use the summary() function
+```{r}
+summary(oecd_data)
+```
+
+d)
+Use the standard plot-function from R (not ggplot()) that get a first visual view
+on the data.
+To get a plot of the whole dataframe we use the plot function and input the dataframe
+```{r}
+plot(oecd_data)
+```
+
+e)
+How many observations are there by country, by year? Show it in a table.
+To get the amount of observations by country and year we can use the table() function
+
+```{r}
+table(oecd_data$country_code)
+```
+```{r}
+table(oecd_data$year)
+```
+
+
+#### Q2 - dplyr-preparations + first visualizations ----
+a)
+To get to our first visualizations, filter only the observations for UK.
+
+We can do this with indexing and filter in the 'row index':
+```{r}
+oecd_uk <- oecd_data[oecd_data$country_code=='UK',]
+```
+
+
+Or we can use the filter function from the dplyr package:
+```{r}
+library(dplyr)
+oecd_uk <- oecd_data %>%
+  filter(oecd_data$country_code == 'UK')
+```
+
+
+b)
+Group the observations in the dataset from Q2a) by year and get the minimum and
+maximum of pc_real_ppp in the UK.
+
+We use the group_by function to group the data by year and then we summarise using the summarise function (dplyr package)
+```{r}
+
+uk_grouped <- oecd_uk %>% 
+              group_by(year) %>%
+              summarise(minimum = min(pc_real_ppp, na.rm=TRUE), maximum = max(pc_real_ppp, na.rm=TRUE))
+```
+
+c)
+Show in a time series plot the minimum and maximum of pc_real_ppp in the UK over time.
+
+First we reshape the data to long format, so that minimum and maximum can be used as categorical variables. 
+
+```{r}
+library(reshape2)
+uk_grouped_m <- melt(uk_grouped,id.vars="year")
+```
+
+Now, we can start plotting using ggplot2. We plot the time variable (year) on the x axis and assign the y to 'value' (which is all the minimum and maximum values). Using the argument color, we're able to distinguish between minimum and maximum values. Furthermore, we add some labels and titles.
+
+
+```{r}
+library(ggplot2)
+ggplot(uk_grouped_m, aes(x=year, y=value, color=variable)) + 
+       geom_line() +
+       labs(x = "Year",
+       y = "GDP in US Dollars",
+       title = "Maximum & Minimum GDP UK over time")
+```
+
+
+
+#### Q3 - data wrangling ----
+a)
+Back to our original dataset, loaded in Q1b). Get for each country in 2015 the name of the region with the largest pc_real_ppp.
+
+Using dplyr we use the group_by function to group the data by country and year. Using the filter and the max() function we only keep the largest values (per country and year) in the year 2015. Then, we arrange the data by pc_real_ppp desc and select only the variable in which we're interested.
+```{r}
+oecd_region <- oecd_data %>%  
+               group_by(country_code, year) %>%
+               filter(pc_real_ppp == max(pc_real_ppp), year==2015) %>%
+               arrange(desc(pc_real_ppp)) %>%
+               select(country_code, region, pc_real_ppp)
+oecd_region
+```
+
+b) 
+(Again use the dataset loaded in Q1b) We need to scale the data such that countries 
+are comparable. Mutate pc_real_ppp such that it is relative to the countries average 
+by year. You thus need to find the average over the observations of pc_real_ppp 
+grouped by country_code and by year.
+
+First, we group by country and year. Then, we use the mutate function to calculate an average over this group (removing NA's is necessary to make sure we always get a value), then we calculate relative pc_real_ppp by dividing by the average calculated previosuly. Lastly, we select the attributes in which we're interested.
+```{r}
+oecd_scaled <- oecd_data %>% 
+               group_by(country_code, year) %>%
+               mutate(average_by_country_year = mean(pc_real_ppp, na.rm = TRUE), 
+                     pc_real_ppp = pc_real_ppp/average_by_country_year) %>%
+               select(country_code, year, region, pc_real_ppp)
+oecd_scaled
+```
+
+
+
+c)
+Repeat Q2b) over the dataset created in Q3b), but now having the minimum and maximum for each year, for each country.
+First, we take the previous dataset (oecd_scaled) and group by year and country. Using the summary function we get the minimum and maximum, removing NA's (NA's will cause the value to be NA if 1 observation is NA). Lastly, we arrange the data by country and year.
+
+```{r}
+oecd_scaled_grouped <- oecd_scaled %>%
+                       group_by(year, country_code) %>%
+                       summarise(minimum = min(pc_real_ppp, na.rm=TRUE), maximum = max(pc_real_ppp, na.rm=TRUE)) %>%
+                       arrange(country_code, year)
+
+oecd_scaled_grouped
+```
+
+c)
+Read the data from 'oecd_names.csv'.
+We load the data using the read.csv function. Data has headers.
+
+```{r}
+oecd_names <- read.csv("oecd_names.csv", header = TRUE)
+```
+
+
+d)
+Join the oecd_names and the data.frame from Q3c) making sure all observations of the latter data.frame are kept.
+We join the previous dataframe (oecd_scaled_grouped) with the oecd_names dataframe. To ensure we keep all observations from the first dataframe we use a left join with the join condition: country_code = oecd.imp.code
+
+```{r}
+oecd_join <- oecd_scaled_grouped %>%
+             left_join(oecd_names, by = c('country_code' = 'oecd.imp.code'))
+oecd_join
+```
+
+e) Repeat Q2c) and show the minimum and maximum by country (Use 'country' instead of 'country_code'). Give each country its own color (not the default colors). Let minimum and maximum have different line types. Update the visualization such to make it look nicer using the tools at hand (given to you in the lectures)
+
+First, we join the data set with names to get the country names, then we group by country and year and finally minimums and maximums by this group are calculated. 
+```{r}
+oecd_3e <- oecd_data %>%
+              left_join(oecd_names, by = c('country_code' = 'oecd.imp.code')) %>%
+              group_by(country, year) %>%
+              summarise(minimum = min(pc_real_ppp, na.rm=TRUE), maximum = max(pc_real_ppp, na.rm=TRUE))
+```
+
+
+First we reshape the data to long format, so that minimum, maximum and country can be used as categorical variables in upcoming plots
+
+```{r}
+oecd_3e_m <- melt(oecd_3e, id.vars = c('country','year')) 
+```
+
+Secondly, we manually make up some colors and put these in the vector 'colors'. These are to be used in the plot itself.
+```{r}
+colors <- c('red', 'green', 'blue', 'yellow', 'purple', 'pink', 'orange', 'black')
+```
+
+We plot the time variable (year) on the x axis, we assign y to 'value' (previously minimum or maximum pc_real_ppp). Now its time to do some finetuning, adding arguments for color (which we want to be determined by country) and linetype (which must be determined by minimum or maximum value of pc_real_ppp). Next, we add our manually selected list of colors to be used in the plot. Last, we add some labels and titles to make the plot more easily understood.
+
+```{r}
+ggplot(oecd_3e_m, aes(x=year, y=value, color = country, linetype = variable)) + geom_line() + 
+  scale_color_manual(values = colors) +
+  labs(x = "Year",
+       y = "GDP in US Dollars",
+       title = "Maximum & Minimum GDP over time")
+```
+
