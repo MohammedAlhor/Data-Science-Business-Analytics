@@ -42,7 +42,6 @@
 # Load the tidyverse-package.
 library(tidyverse)
 library(dplyr)
-library(ggplot2)
 # b)
 # Read the data from 'oecd_data.csv'.
 # Set our working directory
@@ -102,15 +101,19 @@ uk_grouped <- oecd_uk %>%
               group_by(year) %>%
               summarise(minimum = min(pc_real_ppp, na.rm=TRUE), maximum = max(pc_real_ppp, na.rm=TRUE))
 uk_grouped
+
 # c)
 # Show in a time series plot the minimum and maximum of pc_real_ppp in the UK over 
 # time.
+
 library(ggplot2)
 library(reshape2)
-# Reshaping the dataframe
+# First we reshape the data to long format, so that minimum and maximum can be used as categorical variables. 
 uk_grouped_m <- melt(uk_grouped,id.vars="year")
 
-# Plot using ggplot
+# Now, we can start plotting using ggplot2. We plot the time variable (year) on the x axis and assign the y to 'value' (which is all the minimum and maximum values). 
+# Using the argument color, we're able to distinguish between minimum and maximum values. Furthermore, we add some labels and titles.
+
 ggplot(uk_grouped_m, aes(x=year, y=value, color=variable)) + 
   geom_line() +
   labs(x = "Year",
@@ -123,6 +126,9 @@ ggplot(uk_grouped_m, aes(x=year, y=value, color=variable)) +
 # Back to our original dataset, loaded in Q1b). Get for each country in 2015 the 
 # name of the region with the largest pc_real_ppp.
 
+# Using dplyr we use the group_by function to group the data by country and year. 
+# Using the filter and the max() function we only keep the largest values (per country and year) in the year 2015. 
+# Then, we arrange the data by pc_real_ppp desc and select only the variable in which we're interested.
 oecd_region <- oecd_data %>%  
                group_by(country_code, year) %>%
                filter(pc_real_ppp == max(pc_real_ppp), year==2015) %>%
@@ -136,6 +142,9 @@ oecd_region
 # by year. You thus need to find the average over the observations of pc_real_ppp 
 # grouped by country_code and by year.
 
+# First, we group by country and year. Then, we use the mutate function to calculate an average over this group (removing NA's is necessary to make sure we always get a value), 
+# then we calculate relative pc_real_ppp by dividing by the average calculated previosuly. Lastly, we select the attributes in which we're interested.
+
 oecd_scaled <- oecd_data %>% 
                group_by(country_code, year) %>%
                mutate(average_by_country_year = mean(pc_real_ppp, na.rm = TRUE), 
@@ -147,6 +156,9 @@ oecd_scaled
 # Repeat Q2b) over the dataset created in Q3b), but now having the minimum and maximum 
 # for each year, for each country.
 
+# First, we take the previous dataset (oecd_scaled) and group by year and country. Using the summary function we get the minimum and maximum, 
+# removing NA's (NA's will cause the value to be NA if 1 observation is NA). Lastly, we arrange the data by country and year.
+
 oecd_scaled_grouped <- oecd_scaled %>%
                        group_by(year, country_code) %>%
                        summarise(minimum = min(pc_real_ppp, na.rm=TRUE), maximum = max(pc_real_ppp, na.rm=TRUE)) %>%
@@ -157,6 +169,7 @@ oecd_scaled_grouped
 
 # c)
 # Read the data from 'oecd_names.csv'.
+
 # load the data using the read.csv function. Data has headers.
 oecd_names <- read.csv("oecd_names.csv", header = TRUE)
 
@@ -164,8 +177,12 @@ oecd_names <- read.csv("oecd_names.csv", header = TRUE)
 # Join the oecd_names and the data.frame from Q3c) making sure all observations of 
 # the latter data.frame are kept.
 
+# We join the previous dataframe (oecd_scaled_grouped) with the oecd_names dataframe. To ensure we keep all observations from the first dataframe 
+# we use a left join with the join condition: country_code = oecd.imp.code
+
 oecd_join <- oecd_scaled_grouped %>%
-             left_join(oecd_names, by = c('country_code' = 'oecd.imp.code'))
+             left_join(oecd_names, by = c('country_code' = 'oecd.imp.code')) %>%
+             select(country, year, minimum, maximum)
 oecd_join
 
 # e) Repeat Q2c) and show the minimum and maximum by country (Use 'country' instead
@@ -173,25 +190,26 @@ oecd_join
 # Let minimum and maximum have different line types. Update the visualization such
 # to make it look nicer using the tools at hand (given to you in the lectures)
 
+# We use the dataframe oecd_join with relative pc_real_ppp by country and year. First we reshape the data to long format, so that minimum, maximum and country can be used as categorical variables in upcoming plots
 
-oecd_3e <- oecd_data %>%
-              left_join(oecd_names, by = c('country_code' = 'oecd.imp.code')) %>%
-              group_by(country, year) %>%
-              summarise(minimum = min(pc_real_ppp, na.rm=TRUE), maximum = max(pc_real_ppp, na.rm=TRUE))
-?left_join
-oecd_3e_m <- melt(oecd_3e, id.vars = c('country','year')) 
+oecd_3e_m <- melt(oecd_join, id.vars = c('country','year')) 
 
+# Secondly, we manually make up some colors and put these in the vector 'colors'. These are to be used in the plot itself.
 
 colors <- c('red', 'green', 'blue', 'yellow', 'purple', 'pink', 'orange', 'black')
+
+# We plot the time variable (year) on the x axis, we assign y to 'value' (previously minimum or maximum pc_real_ppp). Now its time to do some finetuning, 
+# adding arguments for color (which we want to be determined by country) and linetype (which must be determined by minimum or maximum value of pc_real_ppp). 
+# Next, we add our manually selected list of colors to be used in the plot. Last, we add some labels and titles to make the plot more easily understood.
 
 ggplot(oecd_3e_m, aes(x=year, y=value, color = country, linetype = variable)) + geom_line() + 
   scale_color_manual(values = colors) +
   labs(x = "Year",
-       y = "GDP in US Dollars",
-       title = "Maximum & Minimum GDP over time")
+       y = "Relative GDP",
+       title = "Maximum & Minimum GDP over time by Country") 
 
 
-?ggplot
+
 #### Q4 - wrap-up ----
 # Great Britain is highly dominating this visualization, since they have a region
 # (City of London) where pc_real_ppp is relatively high. The reason is that this 
@@ -211,5 +229,37 @@ ggplot(oecd_3e_m, aes(x=year, y=value, color = country, linetype = variable)) + 
 # Based on the first graph, people reacted: dispersion between regions grows!
 # What can you conclude (differently)?
 
+# The variable 'per' has some missing values (KR en FR) we need to filter these out in our dplyr statement before calculations. 'Real_ppp' has no missing values.
+summary(oecd_data$per)
+summary(oecd_data$real_ppp)
+
+
+# Step by step what we do in the following dplyr statement. First we take the oecd_data dataframe and filter out the rows with missing values for 'per'. 
+# Thereafter, we join oecd_names dataframe to get the full country names. Then, we group by country and year to calculate real_ppp per worker (real_ppp_per), 
+# the average ppp per worker per country by year. We use this to calculate the relative GDP per worker. We use summarise to calculate 5% and 95% quantiles of this variable. 
+# Now we have to get our data ready to plot. We reshape the data to long format, using the melt function. Last, we plot our new variable over time (year) by country and for 
+# the different quantiles. We do this in 1 dplyr statement.
+  oecd_data %>%
+  filter(!is.na(per)) %>%
+  left_join(oecd_names, by = c('country_code' = 'oecd.imp.code')) %>%
+  group_by(country, year) %>%
+  mutate(real_ppp_per = real_ppp/per, 
+         average_by_country_year = mean(real_ppp_per, na.rm = TRUE), 
+         real_ppp_per = real_ppp_per/average_by_country_year) %>%
+  summarise('5% Quantile' = quantile(real_ppp_per, 0.05,na.rm=TRUE),'95% Quantile' = quantile(real_ppp_per, 0.95, na.rm=TRUE)) %>%  
+  melt(id.vars = c('country','year')) %>%
+  ggplot(aes(x=year, y=value, color = country, linetype = variable)) + 
+    geom_line() + 
+    scale_color_manual(values = colors) +
+    labs(x = "Year",
+         y = "Relative GDP per worker",
+         title = "5% & 95% quantiles of GDP over time by country")
+
+# Compared to the first plot, we can conclude the dispersion between regions has not been growing, it remains relatively stable over the years.
+# In some cases(South Korea) we can even see a decline in the dispersion. 
+# P.S. We had to drop missing values for South Korea, that's why the data for this country starts from 2007.
+  
+  
+  
 
 # The end ----

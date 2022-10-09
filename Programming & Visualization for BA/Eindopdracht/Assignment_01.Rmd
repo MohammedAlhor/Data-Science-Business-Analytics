@@ -173,6 +173,7 @@ Read the data from 'oecd_names.csv'.
 We load the data using the read.csv function. Data has headers.
 
 ```{r}
+setwd("~/Data-Science-Business-Analytics/Data")
 oecd_names <- read.csv("oecd_names.csv", header = TRUE)
 ```
 
@@ -183,25 +184,18 @@ We join the previous dataframe (oecd_scaled_grouped) with the oecd_names datafra
 
 ```{r}
 oecd_join <- oecd_scaled_grouped %>%
-             left_join(oecd_names, by = c('country_code' = 'oecd.imp.code'))
+             left_join(oecd_names, by = c('country_code' = 'oecd.imp.code')) %>%
+             select(country, year, minimum, maximum)
 oecd_join
 ```
 
 e) Repeat Q2c) and show the minimum and maximum by country (Use 'country' instead of 'country_code'). Give each country its own color (not the default colors). Let minimum and maximum have different line types. Update the visualization such to make it look nicer using the tools at hand (given to you in the lectures)
 
-First, we join the data set with names to get the country names, then we group by country and year and finally minimums and maximums by this group are calculated. 
-```{r}
-oecd_3e <- oecd_data %>%
-              left_join(oecd_names, by = c('country_code' = 'oecd.imp.code')) %>%
-              group_by(country, year) %>%
-              summarise(minimum = min(pc_real_ppp, na.rm=TRUE), maximum = max(pc_real_ppp, na.rm=TRUE))
-```
 
-
-First we reshape the data to long format, so that minimum, maximum and country can be used as categorical variables in upcoming plots
+We use the dataframe oecd_join with relative pc_real_ppp by country and year. First we reshape the data to long format, so that minimum, maximum and country can be used as categorical variables in upcoming plots
 
 ```{r}
-oecd_3e_m <- melt(oecd_3e, id.vars = c('country','year')) 
+oecd_3e_m <- melt(oecd_join, id.vars = c('country','year')) 
 ```
 
 Secondly, we manually make up some colors and put these in the vector 'colors'. These are to be used in the plot itself.
@@ -215,7 +209,44 @@ We plot the time variable (year) on the x axis, we assign y to 'value' (previous
 ggplot(oecd_3e_m, aes(x=year, y=value, color = country, linetype = variable)) + geom_line() + 
   scale_color_manual(values = colors) +
   labs(x = "Year",
-       y = "GDP in US Dollars",
-       title = "Maximum & Minimum GDP over time")
+       y = "Relative GDP",
+       title = "Maximum & Minimum GDP over time by Country") 
 ```
 
+
+#### Q4 - wrap-up ----
+Reproduce the plot from Q3e) with
+1. real_ppp per worker (which can be created using real_ppp and per from the data.frame
+2. 5% en 95% quantiles instead of minimum and maximum
+Still remember to do the scaling as in Q3b)
+Can you do this without any intermediate results? (using Pipes %>%)
+Based on the first graph, people reacted: dispersion between regions grows!
+What can you conclude (differently)?
+
+The variable 'per' has some missing values (KR en FR) we need to filter these out in our dplyr statement before calculations. 'Real_ppp' has no missing values. 
+
+```{r}
+summary(oecd_data$per)
+```
+
+Step by step what we do in the following dplyr statement. First we take the oecd_data dataframe and filter out the rows with missing values for 'per'. Thereafter, we join oecd_names dataframe to get the full country names. Then, we group by country and year to calculate real_ppp per worker (real_ppp_per), the average ppp per worker per country by year. We use this to calculate the relative GDP per worker. We use summarise to calculate 5% and 95% quantiles of this variable. Now we have to get our data ready to plot. We reshape the data to long format, using the melt function. Last, we plot our new variable over time (year) by country and for the different quantiles. We do this in 1 dplyr statement.
+
+```{r}
+  oecd_data %>%
+  filter(!is.na(per)) %>%
+  left_join(oecd_names, by = c('country_code' = 'oecd.imp.code')) %>%
+  group_by(country, year) %>%
+  mutate(real_ppp_per = real_ppp/per, 
+         average_by_country_year = mean(real_ppp_per, na.rm = TRUE), 
+         real_ppp_per = real_ppp_per/average_by_country_year) %>%
+  summarise('5% Quantile' = quantile(real_ppp_per, 0.05,na.rm=TRUE),'95% Quantile' = quantile(real_ppp_per, 0.95, na.rm=TRUE)) %>%  
+  melt(id.vars = c('country','year')) %>%
+  ggplot(aes(x=year, y=value, color = country, linetype = variable)) + 
+    geom_line() + 
+    scale_color_manual(values = colors) +
+    labs(x = "Year",
+         y = "Relative GDP per worker",
+         title = "5% & 95% quantiles of GDP over time by country")
+```
+
+Compared to the first plot, we can conclude the dispersion between regions has not been growing over the years. In some cases(South Korea) we can even see a decline in the dispersion. We had to drop missing values for South Korea, that's why the data for this country starts from 2007.
