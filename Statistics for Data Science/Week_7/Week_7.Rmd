@@ -1,0 +1,33 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+
+GLM, generalized linear model. 
+Distribution function
+linear predictor
+link function g()
+variance is a usually some functon of the expectation. Speelt niet echt een rom
+
+Welke verdeling
+variabele die je gebruikt
+wat voor link functie wil je gebruiken
+
+binaire data
+
+1- Bernoulli verdeling. Kans op succes is de parameter van deze verdeling. Normale heeft verwachting en variantie. Wat is de succes kans heet hier pi. Kans op Y=1 is exact de verwachting.
+Standard linear predictor n = x*B
+
+Logit:
+Probit: cdf van stndaard normale verdeling. 
+Complementary log-log
+
+Logit is meest gebruikte. Variantie speelt ook een rol, 
+
+glm(y~x, family=binomial(link=probit), data = dataframe) -- standaard linkfunctie, logit
+summary,coef, confint, predict, plot, step.
+
+plot(predictorEffects(m)) from package effects
