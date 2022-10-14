@@ -1,52 +1,76 @@
-#libs
-library(lmtest)
-library(car)
-lm <- lm(Murder~Population + Illiteracy + Income + Frost, data=dataset)
-qqPlot(lm)
-# studentized residuals vs. the student t distribution
-# A3 test for linearity
-crPlots(lm)
+# Statistics for Data Science
+# Lecture 5
+# In-class assignment 5.2
+# Regression exercise / Diagnostics
 
-# antwoorden
-fit1 <- lm(Murder~Population + Illiteracy + Income + Frost, data=dataset)
+#------------------------------------------------------------
+# requires packages car, lmtest and sandwich					      
+# install.packages("car")			             
+# install.packages("lmtest")
+# install.packages("sandwich")
+
+#------------------------------------------------------------
+
+# Setup the data and run the basic regression
+
+dataset <- as.data.frame(state.x77[, c("Murder","Population", "Illiteracy", "Income", "Frost")])
+
+fit1 <- lm(Murder~Population+Illiteracy+Income+Frost, data=dataset)
+
+# Test Normality
+library(car)
+
 qqPlot(fit1)
-# Nevada is een outlier, komt waarschijnlijk door frost
+
+# More details about the outlier
 
 dataset["Nevada", ]
 fitted(fit1)["Nevada"]
 fit1$residuals["Nevada"]
 
-
-# Autocorrelate A5
+# Test independence
 durbinWatsonTest(fit1)
+# No autocorrelation detected, but
+# does this test make sense for this type of data?
+# -> Not really (data is sorted in alphabethical order)
 
+# Test linearity...
 fit2 <- lm(Murder~Population+Income, data=dataset)
+
+# ...using component + residual plot
 crPlots(fit2)
-#linearity Population is redelijk linear, income is parabalisch maar wordt verklaard door Alaska.
-# Verband dat anders is dan lineair is waar we op zoek naar zijn.
-# Inkomen lijkt dus linear A3 is aanname voor linear verband.
-# blauwe lijn is beta coefficient * populatie
+# Especially the impact of Income seems to be non-linear
 
-#consider alternative model with logs
-fit3 <- lm(Murder~log(Population)+ Income + I(Income^2), data = dataset)
+# Check this with the RESET test
+# H0: linear relation between x and y
+# Ha: some nonlinearity
+library(lmtest)
+resettest(fit2, power=2)
+# p-value < 0.05 -> we reject linearity
+
+# consider alternative model
+fit3 <- lm(Murder~log(Population)+Income+I(Income^2), data=dataset)
 crPlots(fit3)
-resettest(fit3, power =2)
+resettest(fit3, power=2)
 summary(fit3)
+# Much better results!
 
+#Part II
 
-# test for homoskedacticity 
-fit4 <- lm(Murder~Income+Population, data=dataset)
+# Test homoscedasticity
+fit2 <- lm(Murder~Population+Income, data=dataset)
+
+ncvTest(fit2)
+# We reject H0 of homoskedasticity -> variances are not constant
+
+# run significance test with alternative standard errors
 library(sandwich)
-library(car)
+coeftest(fit2, vcov=vcovHC)
+# vs original (wrong) results
+coeftest(fit2)
 
-ncvTest(fit4)
-# p waarde is klein, sig niv van 5% null hyptohese verwerpen. Model bevat heteroskedacticiteit
+# Test multicollinearity
+fit1 <- lm(Murder~Population+Illiteracy+Income+Frost, data=dataset)
 
-vcovHC(fit4)
-coeftest(fit4, vcov = vcovHC)
-?coeftest
-# hoe interpreteren we deze.
 vif(fit1)
-# is niet groter dan 4 dus, nee. 
-
-
+# Nothing to worry about here

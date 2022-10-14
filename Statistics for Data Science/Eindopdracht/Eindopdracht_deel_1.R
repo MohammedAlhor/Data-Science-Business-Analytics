@@ -3,7 +3,8 @@
 
 # 1. Lees de data in als dataframe en zorg ervoor dat de eerste kolom als label voor de
 #    rijen wordt gebruikt. Hint: zie ?row.names.
-setwd("~/Documents/Data-Science-Business-Analytics/Data")
+# setwd("~/Documents/Data-Science-Business-Analytics/Data")
+setwd("~/Data-Science-Business-Analytics/Data")
 college_statistics <- read.csv("college_statistics.csv", header = TRUE )
 # Rownames vullen met inhoud van de eerste kolom
 rownames(college_statistics) <- college_statistics[,1]
