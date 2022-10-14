@@ -20,6 +20,7 @@ qqnorm(college_statistics$Apps)
 shapiro.test(college_statistics$Apps)
 
 # The p-value is less than 0.05, which means the null hypothesis can be rejected and the data is not normally distributed.
+<<<<<<< HEAD
 
 # 4 (b) Deel de data eerst op willekeurige manier op in een “estimation” en “test”
 # sample. Neem 600 universiteiten in de estimation sample. Zorg ervoor dat deze
@@ -74,3 +75,5 @@ summary(lm)
 # Backwards step regression
 backresults <- stepAIC(lm2, direction = "backward")
 
+=======
+>>>>>>> 70093729e87bdc3dbabde8cfcfa1fd8363d0e9c1
