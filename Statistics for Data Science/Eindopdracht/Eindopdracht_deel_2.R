@@ -67,7 +67,7 @@ plot(lm)
 
 # 4 (f) Maak vervolgens een model voor de logaritme van het aantal aanmeldingen (ook weer met backward elimination).
 
-lm2 <- lm(log(Apps) ~ Private + Accept + Enroll + Top10perc + Top25perc + F.Undergrad + P.Undergrad + Outstate + Room.Board + Books + Personal + PhD + Terminal +
+lm2 <- lm(log(Apps) ~ Private + Top10perc + Top25perc + F.Undergrad + P.Undergrad + Outstate + Room.Board + Books + Personal + PhD + Terminal +
            S.F.Ratio + perc.alumni + Expend + Grad.Rate , data = college_statistics_est)
 summary(lm)
 
