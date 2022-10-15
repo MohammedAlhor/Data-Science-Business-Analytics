@@ -35,7 +35,7 @@ college_statistics_test <- college_statistics[-train_ind,]
 # 4 (c) Maak eerst een lineair model voor het aantal aanmeldingen. Gebruik hiervoor
 # alleen de estimation sample.
 
-lm <- lm(Apps ~ Private + Accept + Enroll + Top10perc + Top25perc + F.Undergrad + P.Undergrad + Outstate + Room.Board + Books + Personal + PhD + Terminal +
+lm <- lm(Apps ~ Private + Top10perc + Top25perc + F.Undergrad + P.Undergrad + Outstate + Room.Board + Books + Personal + PhD + Terminal +
            S.F.Ratio + perc.alumni + Expend + Grad.Rate , data = college_statistics_est)
 summary(lm)
 
@@ -56,11 +56,48 @@ lm <- backmodel
 summary(lm)
 
 # 4 (e) Voer diverse toetsen uit om de aannamen van het lineaire model te testen.
+# Normality, Independence, Linearity, Homoskedasticity, Multicollinearity
+
+# A3 Linearity:
+
+# ...using component + residual plot
+crPlots(lm)
+
+# Especially the impact of Income seems to be non-linear
+# Check this with the RESET test
+# H0: linear relation between x and y
+# Ha: some nonlinearity
+library(lmtest)
+resettest(lm, power=2)
+# p-value < 0.05 -> we reject linearity
+
+# A4 Homoskedasticity
+ncvTest(lm)
+coeftest(lm, vcov='vcovHC')
+# We reject H0 of homoskedasticity -> variances are not constant
+
+# We use the qqPlot to check for normality A6
+qqPlot(lm)
+resettest(lm, power=2)
+
+
+# A7 Multicolinearity (No perfect linear relationship in X)
+vif(lm)
+# None are larger than 4, rule of thumb
+
+# Simple outlier test
+outlierTest(lm)
+
+
+# This qqplot shows a non linear
+
 
 # basic diagnostics:
 qqPlot(lm)
 par(mfrow=c(2,2))
 plot(lm)
+
+
 
 # Advanced diagnostics:
 
@@ -74,4 +111,54 @@ summary(lm)
 # Backwards step regression
 backresults <- stepAIC(lm2, direction = "backward")
 
-crplot
+# Record the best model selected by the backwards method
+# This line takes the model specification as 'code'
+backmodel <- backresults$call
+backmodel
+# This line evaluates the 'code' of the model
+backmodel <- eval(backmodel)
+summary(backmodel)
+
+lm2 <- backmodel
+summary(lm)
+
+
+crPlots(lm2)
+
+# A3 Linearity:
+
+# ...using component + residual plot
+crPlots(lm2)
+
+# We see a more linear relationship
+
+# Especially the impact of Income seems to be non-linear
+# Check this with the RESET test
+# H0: linear relation between x and y
+# Ha: some nonlinearity
+resettest(lm2, power=2)
+# p-value < 0.05 -> we reject linearity
+
+# A4 Homoskedasticity
+ncvTest(lm2)
+coeftest(lm2, vcov='vcovHC')
+# We reject H0 of homoskedasticity -> variances are not constant
+
+# We use the qqPlot to check for normality A6
+qqPlot(lm2)
+resettest(lm, power=2)
+
+
+# A7 Multicolinearity (No perfect linear relationship in X)
+vif(lm)
+# None are larger than 4, rule of thumb
+
+# Simple outlier test
+outlierTest(lm2)
+
+
+summary(lm)
+summary(lm2)
+# Test model against full model
+anova(lm, lm2)
+# No significant difference (which is "good"), selected model is preferred
