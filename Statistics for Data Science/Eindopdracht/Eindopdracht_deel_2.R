@@ -74,3 +74,4 @@ summary(lm)
 # Backwards step regression
 backresults <- stepAIC(lm2, direction = "backward")
 
+crplot
