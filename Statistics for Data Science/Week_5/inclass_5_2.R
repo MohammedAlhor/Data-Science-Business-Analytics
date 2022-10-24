@@ -15,17 +15,17 @@
 
 dataset <- as.data.frame(state.x77[, c("Murder","Population", "Illiteracy", "Income", "Frost")])
 
-fit1 <- lm(Murder~Population+Illiteracy+Income+Frost, data=dataset)
+fit3 <- lm(Murder~Population+Illiteracy+Income+Frost, data=dataset)
 
 # Test Normality
 library(car)
 
-qqPlot(fit1)
+qqPlot(fit3)
 
 # More details about the outlier
 
 dataset["Nevada", ]
-fitted(fit1)["Nevada"]
+fitted(fit3)["Nevada"]
 fit1$residuals["Nevada"]
 
 # Test independence
@@ -46,6 +46,7 @@ crPlots(fit2)
 # Ha: some nonlinearity
 library(lmtest)
 resettest(fit2, power=2)
+?resettest
 # p-value < 0.05 -> we reject linearity
 
 # consider alternative model
@@ -61,7 +62,7 @@ summary(fit3)
 fit2 <- lm(Murder~Population+Income, data=dataset)
 
 ncvTest(fit2)
-# We reject H0 of homoskedasticity -> variances are not constant
+# We cannot reject H0 of homoskedasticity -> variances are constant
 
 # run significance test with alternative standard errors
 library(sandwich)
