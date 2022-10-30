@@ -1,0 +1,199 @@
+---
+title: "Eindopdracht_deel_3"
+author: "Mohammed Al Hor"
+date: "2022-10-30"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Libraries
+library(dplyr)
+library(car)
+library(effects)
+library(tidyverse)
+library(MASS)
+library(leaps)
+library(sandwich)
+library(lmtest)
+library(caret)
+library(ggplot2)
+```
+
+Laden data
+```{r}
+# setwd("~/Documents/Data-Science-Business-Analytics/Data")
+setwd("~/Data-Science-Business-Analytics/Data")
+college_statistics <- read.csv("college_statistics.csv", header = TRUE, strip.white = TRUE, stringsAsFactors = FALSE, na.strings = c("NA", "") )
+# Rownames vullen met inhoud van de eerste kolom
+rownames(college_statistics) <- college_statistics[,1]
+# Verwijder eerste kolom
+college_statistics <- college_statistics[,-1]
+
+```
+
+# 6. Maak een model om de factoren te vinden die bijdragen aan een hoog “slagingssucces”.
+
+6 (a) Definieer een nieuwe variabele die 1 als het slagingspercentage groter is dan 60% en 0 als dat niet zo is.
+
+Graduation rate cannot be higher than 100, therefore we must drop this observation
+
+```{r}
+summary(college_statistics$Grad.Rate)
+
+```
+
+We use mutate to create a dummy variable and a case when to set the conditions for this variable.
+
+```{r}
+df <- college_statistics %>%
+        filter(!Grad.Rate>100) %>% 
+        mutate(gr_dummy = case_when(Grad.Rate > 60 ~ 1, Grad.Rate <=60 ~ 0))
+```
+
+Make this a factor variable
+
+```{r}
+df$gr_dummy <-  as.factor(df$gr_dummy)
+```
+
+
+6 (b) Deel de data opnieuw op in een estimation en een test sample.
+
+We set the seed so results can be replicated.
+```{r}
+set.seed(123) 
+```
+
+take the sample for the training data set, we use the same sample size as in previous questions
+
+```{r}
+train_ind <- sample(seq_len(nrow(df)), size=600)
+```
+
+
+```{r}
+college_statistics_est <- df[train_ind,] # estimation set
+college_statistics_test <- df[-train_ind,] # test set
+```
+
+
+6 c) Maak mbv. de estimation data een logit model om de slagingssucces variabele te verklaren. Denk hierbij goed na over transformaties van je variabelen. Bij-
+voorbeeld heeft het zin om het aantal applicaties, aantal acceptaties, en het aantal enrollments in hetzelfde model op te nemen? Of kunnen sommige van
+deze variabelen beter als percentages opgenomen worden?
+
+First, we model without any transformations
+
+```{r}
+fit1 <- glm(gr_dummy ~ Private + Apps + Accept + Enroll + Top10perc + Top25perc + F.Undergrad + P.Undergrad + Outstate + Room.Board + Books + Personal + PhD + Terminal + S.F.Ratio + perc.alumni + Expend ,family = binomial(link=logit), data = college_statistics_est)
+```
+
+```{r}
+summary(fit1)
+vif(fit1)
+```
+
+
+We see that Apps, Accept and enroll have vif values of 20+(this makes sense, there's obviously some multicolineairity at play here). Let's do some transformations on Enroll and Accept to mitigate this.
+
+For both the test and estimation dataframe we calculate the percentage of students that applied and got accepted and the percentage of students enrolled vs. the ones that got accepted.
+
+```{r}
+college_statistics_est <- college_statistics_est %>% mutate(acc_rate = Accept/Apps, 
+                                  enroll_rate = Enroll/Accept)                      #  accepted and actually enrolled
+college_statistics_test <- college_statistics_test %>% mutate(acc_rate = Accept/Apps, 
+                                   enroll_rate = Enroll/Accept)
+```
+
+
+Let do some modeling on these transformed variables.
+
+```{r}
+fit2 <- glm(gr_dummy ~ Private + Apps + acc_rate + enroll_rate + Top10perc + Top25perc + F.Undergrad + P.Undergrad + Outstate + Room.Board + Books + Personal + PhD + Terminal + S.F.Ratio + perc.alumni + Expend ,family = binomial(link=logit), data = college_statistics_est)
+summary(fit2)
+vif(fit2)
+```
+
+We observe a significant decrease of the VIF for these variables. Let's move on to the next question and do some variable selection. This model contains too many variables.
+
+6 (d) Gebruik wederom backward selection om het aantal verklarende variabelen te verkleinen.
+
+We use backward selection, the code is as follows.
+
+```{r}
+backresults <- stepAIC(fit2, direction = "backward")
+```
+
+We record the best model selected by the backwards method. This line takes the model specification as 'code'
+
+```{r}
+backmodel <- backresults$call
+backmodel
+# This line evaluates the 'code' of the model
+backmodel <- eval(backmodel)
+summary(backmodel)
+```
+
+Assign this model to 'fit2'.
+```{r}
+fit2 <- backmodel
+```
+
+```{r}
+summary(fit2) 
+vif(fit2)
+```
+None of the vif values are larger than 4 (rule of thumb), thus no multicolinearity.
+
+Lastly to get a better feel for the model and its coefficients we can use the effects package to get ceteris paribus plots
+
+```{r}
+plot(predictorEffects(fit2))
+```
+
+
+6 (e) Welke variabelen hebben uiteindelijk een significante invloed?
+
+Private, Apps, Top25perc, P.Undergrad, Outstate, Room.Board, Books, perc.alumni and Expend are significant at the 5 percent level. The variables have a significant effect.
+
+6 (f) Bereken het percentage goed voorspelde scholen zowel voor de estimation sample als voor de test sample (maak eerst voorspellingen voor beide datasets en gebruik daarna bijvoorbeeld de functie confusionMatrix()).
+
+Let's get to the fun stuff and do some predictions on the estimation (training) dataset and the test set we made.
+
+```{r}
+college_statistics_test$predict <- predict(fit2, newdata = college_statistics_test)
+college_statistics_est$predict <- predict(fit2, newdata = college_statistics_est)
+```
+
+We need to convert the predictions to 0's and 1's.
+
+```{r}
+college_statistics_test <- college_statistics_test %>% 
+  mutate(predict2 = case_when(predict >= 0.5 ~ 1,predict < 0.5 ~ 0)) 
+
+college_statistics_est <- college_statistics_est %>% 
+  mutate(predict2 = case_when(predict >= 0.5 ~ 1,predict < 0.5 ~ 0)) 
+```
+
+Let's take a look at our predictions vs. the actual values using a confusion matrix.
+
+```{r}
+confusionMatrix(college_statistics_test$gr_dummy, as.factor(college_statistics_test$predict2))
+```
+
+The accuracy of this model on the test data sits at around 72%. So, to answer the question, the model predicted the correct value (0 or 1) in 72% of the observations.
+
+```{r}
+confusionMatrix(college_statistics_est$gr_dummy, as.factor(college_statistics_est$predict2))
+```
+
+The accuracy of this model on the estimation data sits at around 78%. So, to answer the question, the model predicted the correct value (0 or 1) in 78% of the observations. This is higher than on the test data, for obvious reasons(we used this data to train our model.)
+
+
+
+
