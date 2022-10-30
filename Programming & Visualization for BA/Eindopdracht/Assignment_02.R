@@ -112,7 +112,7 @@ get_relative_migration_counts <- function(data, non_western_only = TRUE){
 }
 
 
-get_relative_migration_counts(data, FALSE) # Default is set to return the fraction_migration_background for non_western migrants, if we set this to false we get this number for migrants of all backgrounds.
+get_relative_migration_counts(data, non_western_only = FALSE) # Default is set to return the fraction_migration_background for non_western migrants, if we set this to false we get this number for migrants of all backgrounds.
 
 
 #### Q3 ----
@@ -125,30 +125,36 @@ get_relative_migration_counts(data, FALSE) # Default is set to return the fracti
 #   then arrange such that you always start with the largest postal code
 #   then use a while loop to go on until 'youth_needed' is reached
 
-get_household_info <- function(data, youth_needed){
+get_household_info <- function(data, youth_needed = 7500){
+  x <- 0
+  i <- 0
+  num_inhab_age <- 
+    map_dfr(data, ~ map_dfr(.x, ~ .x[c("men", "women")], .id = "id"), .id = # we use the map function to iterate through the list and get a  
+              "municipality") %>%                                           # dataframe with the counts for men and women by age group
+    unnest(cols = c(men, women), names_sep = '_')                           # We use unnest to 'flatten' out the data into regular columns
   
+  
+  num_inhab_youth <- num_inhab_age %>%
+    filter(men_age %in% c("0 tot 5 jaar", "5 tot 10 jaar", "10 tot 15 jaar", "15 tot 20 jaar")) %>%  # The data is filtered to remove non youth age groups
+    mutate(count = men_count + women_count) %>%                                                      # Addition of counts(across men and women)
+    group_by(municipality, id) %>%                                                                   # We group by minicipality, and postal code 
+    summarise(count = sum(count)) %>%                                                                # so we can summarise across the youth age groups
+    arrange(desc(count))                                                                             # Lastly we order by the count of youths in a postalcode
+  
+  # Now that we have a ordered dataframe of the number of youths by postal code we need to run through this list untill a certain number of youths is reached.
+  # For this we use a while loop which adds a count(amount of youths) from a postal code in the ordered dataframe 'num_inhab_youths'. 
+  # Since this list is ordered, we always get the minimum required postal codes.
+  
+  while(x < youth_needed){              
+    x <- x + num_inhab_youth$count[i+1]
+    i <- i + 1
+  }
+  return(num_inhab_youth$id[1:i])
 }
 
- num_of_inhab <- map_depth(data, 2, ~print(data))
-?map_depth
-  num_of_inhab <- map_dfr(data, ~ map_dfr(.x, ~ map_dfr(.x[c("men", "women")], ~ map_at("0 tot 5 jaar", ~ sum(.x$count, na.rm = TRUE),
-                                                        .id='test'), 
-                                           .id = 'sex'),# We use nested map functions to iterate through the list to get to the data we want (total number of inhabitants)
-                                           .id = 'id'), 
-                                           .id = 'municipality') %>% mutate(total_inhab = men+women)
+
   
-  
-  num_of_inhab <- map_dfr(data, ~ map_dfr(.x, ~ map_dfr(.x[c("men", "women")] ~ %>% sum(.x$count, na.rm=TRUE), 
-                                           .id = 'sex'),# We use nested map functions to iterate through the list to get to the data we want (total number of inhabitants)
-                                           .id = 'id'), 
-                                           .id = 'municipality') %>% mutate(total_inhab = men+women)
-  
-  
-num_of_inhab <- map_dfr(data, ~ map_dfr(.x, ~ map_dfr(.x, ~ map_dfr(.x[c("0 tot 5 jaar")], ~ sum(.x$count, na.rm= TRUE),
-                                           .id='youth'),
-                                           .id = 'sex'),# We use nested map functions to iterate through the list to get to the data we want (total number of inhabitants)
-                                           .id = 'id'), 
-                                           .id = 'municipality') %>% mutate(total_inhab = men+women) 
+get_household_info(data, 75000)
 
 
 #### Q4 ----
