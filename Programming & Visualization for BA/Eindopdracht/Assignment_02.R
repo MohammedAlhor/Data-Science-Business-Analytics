@@ -1,7 +1,7 @@
 # Erasmus Q-Intelligence ----
+# MOHAMMED AL HOR
 
-
-## Final assignment  ----
+## Final assignment  ---- 
 # covering topics 06-09
 
 
