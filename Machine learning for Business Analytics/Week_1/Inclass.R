@@ -12,3 +12,18 @@ summary(pca.out)
 # punt voor de ellboog kiezen, punt erna voegt niet veel toe.
 
 biplot(pca.out, cex=c(0.5,1), col=c('grey','red'))
+
+
+
+USelections2016 <- read_csv("USelections2016.csv")
+USelections2016<-USelections2016[,-1]
+
+pca.out2<- prcomp(USelections2016)
+plot(pca.out2, type="l")
+summary(pca.out2)
+
+# als de eenheden niet hetzelfde zijn, gaan de varianties ook anders zijn
+# gebruik in dit geval scale.=TRUE
+
+pca.out2<- prcomp(USelections2016, scale.=TRUE)
+biplot(pca.out2, cex=c(0.5,1), col=c('grey','red'))
