@@ -4,11 +4,11 @@ library(dplyr)
 # russia_losses_equipment.csv
 # russia_losses_personnel.csv
 
-russia_losses_equipment <- read_csv("Data/russia_losses_equipment.csv")
+russia_losses_equipment <- read_csv("russia_losses_equipment.csv")
 
 plot(russia_losses_equipment$aircraft)
 
-
+plot(russia_losses_personnel$personnel)
 # first differences, moet eruit gehaald worden
 
 russia_losses_equipment$aircraft_lag <- lag(russia_losses_equipment$aircraft)
@@ -17,3 +17,4 @@ plot(russia_losses_equipment$aircraft_dif)
 
 
 plot(russia_losses_personnel$personnel)
+

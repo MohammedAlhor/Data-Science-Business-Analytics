@@ -1,0 +1,76 @@
+---
+title: "Eindopdracht"
+author: "Mohammed Al Hor"
+date: "2022-12-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+```{r}
+#libs
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(gridExtra)
+library(lmtest)
+library(moments)
+library(tseries)
+library(stringr)
+```
+
+## Deelvraag 1,2 & 3
+Deze zeer relevante dataset bevat de dagelijkse personeelsverliezen aan Russische kant van de oorlog in Ukraine. In dit rapport gaan we kijken naar EDA (Exploratory Data Analysis) doen en daarna een stukje forecasting proberen te doen op deze data. Verschillende visualisaties en modellen zullen aan bod komen. Deze modellen gaan we met elkaar vergelijken om uiteindelijk het beste model uit te kiezen en deze te gebruiken om voorspellingen te doen.
+Inladen van de data:
+```{r}
+setwd("~/Data-Science-Business-Analytics")
+russia_losses_personnel <- read_csv("Data/russia_losses_personnel.csv")
+```
+
+
+Onderstaand figuur geeft ons een eerste blik op de data. Omdat we het hier hebben over cummulatieve personeelsverlizen zien we uitereaard een stijgende lijn in dit aantal. 
+```{r}
+plot1 <- ggplot(russia_losses_personnel, aes(x=date, y=personnel)) +geom_line() + labs(title = "Cummulatieve dagelijkse personeelsverliezen")
+```
+
+
+De eerste verschillen (first differences) worden berekend, zodat we deze kunnen visualizeren.
+```{r}
+russia_losses_personnel <- russia_losses_personnel %>% mutate(diff = personnel - lag(personnel))
+```
+
+Cummulatieve en dagelijkse/incrementel personeelsverliezen onder elkaar.
+```{r}
+require(gridExtra)
+plot2 <- ggplot(russia_losses_personnel, aes(x=date, y=diff)) +geom_point() + geom_smooth() + labs(title = "Incrementele dagelijkse personeelsverliezen")
+grid.arrange(plot1, plot2, ncol=1)
+```
+We observeren een aanzienlijke variantie wat betreft personeelsverliezen in de eerste dagen van de oorlog. Een verklaring voor deze variantie is het feit dat er in de eerste dagen de personeelsverliezen niet dagelijks werden geupdated. We zien voor sommige dagen nul personeelsverliezen die in de opvolgende dagen wordt overgecompenseerd. 
+
+Laten we de dataset opdelen in een training en test set, zodat het echte werk kan beginnen.
+```{r}
+estimation_sample <- russia_losses_personnel %>% filter(date <= '2022-10-03')
+test_sample <- russia_losses_personnel %>% filter(date > '2022-10-03')
+```
+
+
+
+```{r}
+max_lag <- 12
+acf_pacf <- tibble(lag = 1:max_lag,
+                   acf = acf(estimation_sample$personnel, max_lag)$acf[2:(max_lag + 1)],
+                   pacf = pacf(estimation_sample$personnel, max_lag)$acf)
+```
+
+We gaan verder met de verschillen.
+
+
+
+
+
+
+
+
