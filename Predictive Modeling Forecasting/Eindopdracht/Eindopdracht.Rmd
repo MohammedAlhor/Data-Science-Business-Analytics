@@ -21,14 +21,15 @@ library(moments)
 library(tseries)
 library(stringr)
 library(forecast)
+library(car)
 ```
 
 ## Deelvraag 1,2 
 Deze zeer relevante dataset bevat de dagelijkse personeelsverliezen aan Russische kant van de oorlog in Ukraine. In dit rapport gaan we kijken naar EDA (Exploratory Data Analysis) doen en daarna een stukje forecasting proberen te doen op deze data. Verschillende visualisaties en modellen zullen aan bod komen. Deze modellen gaan we met elkaar vergelijken om uiteindelijk het beste model uit te kiezen en deze te gebruiken om voorspellingen te doen.
 Inladen van de data:
 ```{r}
-setwd("~/Data-Science-Business-Analytics")
-russia_losses_personnel <- read_csv("Data/russia_losses_personnel.csv")
+setwd("~/Data-Science-Business-Analytics/Data")
+russia_losses_personnel <- read_csv("russia_losses_personnel.csv")
 ```
 
 
@@ -51,14 +52,14 @@ grid.arrange(plot1, plot2, ncol=1)
 ```
 We observeren een aanzienlijke variantie wat betreft personeelsverliezen in de eerste dagen van de oorlog. Een verklaring voor deze variantie is het feit dat er in de eerste dagen de personeelsverliezen niet dagelijks werden geupdated. We zien voor sommige dagen nul personeelsverliezen die in de opvolgende dagen worden overgecompenseerd. 
 
-Laten we de dataset opdelen in een training en test set, zodat het echte werk kan beginnen.
+Laten we de dataset opdelen in een training en test set.
 ```{r}
 estimation_sample <- russia_losses_personnel %>% filter(date <= '2022-10-03')
 test_sample <- russia_losses_personnel %>% filter(date > '2022-10-03')
 ```
 
 
-We berkenen de (partitiele) autocorrelaties voor de cummulatieve personeelsverliezen:
+We berkenen de (partitiele) autocorrelaties voor de cummulatieve personeelsverliezen(niveau):
 ```{r}
 max_lag <- 15
 acf_pacf <- tibble(lag = 1:max_lag,
@@ -70,8 +71,12 @@ We zien dat alle momenten significant zijn, wat typerend is voor niet stationair
 adf.test(estimation_sample$personnel)
 ```
 Hoge p-waarde maakt het dat we de null hypothese niet kunnen verwerpen (personeelsverliezen zijn dus niet stationair)
+
+
 ## Deelvraag 3
 We gaan verder met de verschillen. Omdat het aantal personeelsverliezen cummulatief is, en dus alleen maar zal groeien, is het handig om te kijken naar de groei of de verschillen in personeelsverliezen. Dit process heet 'detrending' of 'differencing' en wordt toegpast als er een duidelijke trend in de data zit. Deze hebben we in vorige vraag al berekend.
+
+
 ## Deelvraag 4
 Laten we nu gaan kijken naar de (partitiele) autocorrelaties voor incrementele/dagelijkse personeelsverliezen
 
@@ -94,18 +99,47 @@ adf.test(estimation_sample$diff)
 P-waarde is kleiner dan 0.05, we kunnen de null hypothese verwerpen en aannemen dat de data stationair is.
 
 
-Omdat er geen 'cut off' point zit in beide grafieken kunnen we geen definitieve keuze maken tussen een AR of MA model. Ons eerste model wordt dus een ARMA model. De parameters voor dit model gaan we schatten door middel van het 'forecast' package. De auto.arima functie in dit package geeft het beste model terug op basis van AIC. 
+Omdat er geen 'cut off' point zit in beide grafieken kunnen we geen definitieve keuze maken tussen een AR of MA model. Ons eerste model wordt dus een ARMA model. De parameters voor dit model gaan we schatten door middel van het 'forecast' package. De auto.arima functie in dit package geeft het beste model terug op basis van AIC. Het beste model (laagste AIC) is een ARIMA(3,0,3) model. De parameters worden weergegeven in de onderstaande output:
 
 ```{r}
-stepwise_fit <- auto.arima(estimation_sample$diff, stationary = TRUE)
-summary(stepwise_fit)
+stepwise_fit_1 <- auto.arima(estimation_sample$diff, stationary = TRUE)
+summary(stepwise_fit_1)
 arma_1 <- arima(estimation_sample$diff, c(3,0,3))
-summary(arma_1)
+cf <- coef(arma_1) # coefficienten ophalen
+residuals(arma_1)
+fitted.values(arma_1)
+#summary(arma_1)
+cf
 ```
-Het beste model (laagste AIC) is een ARIMA(3,0,3) model. Laten we hierop wat diagnostische testen doen:
+## Deelvraag 6
+In dit onderdeel gaan we een 'deep-dive' doen op dit model, eerst kijken we naar de residuals ten op zichte van de werkelijke waardes en zetten we deze in een grafiek.
+
 ```{r}
-lb_test_result <- Box.test(actuals_predict$residual, lag = 1, type = c("Ljung-Box"), fitdf = 0)
+actuals_predict <- tibble(
+  actual = estimation_sample$diff[1:nrow(estimation_sample)],
+  fitted = fitted.values(arma_1),
+  residual = residuals(arma_1)
+) %>%
+  mutate(n = 1:n())
 ```
+
+```{r}
+ggplot(actuals_predict, aes(x = n)) +
+  geom_line(aes(y = actual), color = "red") +
+  geom_line(aes(y = fitted), color = "green") +
+  geom_line(aes(y = residual), color = "blue")
+```
+
+
+Laten we hierop wat diagnostische testen doen. We beginnen met de Ljung Box test om te checken voor residual autocorrelatie. De null hypothese van is dat de data onafhankelijk zijn verdeeld. 
+```{r}
+lb_test_result <- Box.test(actuals_predict$residual, lag = 1, type = c("Ljung-Box"),) # fit
+lb_test_result
+?Box.test
+```
+Met een p-waarde van 0.4652 kunnen we de null-hypothese niet verwerpen. De residuen zijn onafhankelijk verdeeld en dit is wat we willen hebben voor een correct model.
+
+
 ```{r}
 ar <- lm(diff ~ lag(diff, 1) + lag(diff, 2) + lag(diff, 3) , data = estimation_sample)
 summary(ar)
@@ -122,10 +156,84 @@ summary(ar)
 
 
 
-## Deelvraag 6
+## Deelvraag 7
+In dit onderdeel gaan we twee alternatieve modellen bekijken. Allereerst beschouwen we een ARIMA model op cummulatieve personeelsverliezen. Wederom wordt de de 'auto.arima' functie gebruikt om het optimale model te bepalen. Let op: cummulatieve personeelsverliezen zijn niet stationair, dit hebben we hiervoor getoetst. Om deze reden wordt dit als argument meegegeven.
+```{r}
+stepwise_fit_2 <- auto.arima(estimation_sample$personnel, stationary = FALSE)
+summary(stepwise_fit_2)
+arma_2 <- arima(estimation_sample$personnel, c(2,2,4))
+cf <- coef(arma_2) # coefficienten ophalen
+residuals(arma_2)
+fitted.values(arma_2)
+#summary(arma_1)
+```
+Het beste model dat wordt teruggegeven door de 'auto.arima' functie is een ARIMA(2,2,4). Er is dus twee keer differencing toegepast. De AIC van dit model is iets lager dan het vorige model. Hieronder worden de residuen in een tabel gezet en geplot in een figuur.
+
+```{r}
+actuals_predict_2 <- tibble(
+  actual = estimation_sample$personnel[1:nrow(estimation_sample)],
+  fitted = fitted.values(arma_2),
+  residual = residuals(arma_2)
+) %>%
+  mutate(n = 1:n())
+```
+
+```{r}
+ggplot(actuals_predict_2, aes(x = n)) +
+  geom_line(aes(y = actual), color = "red") +
+  geom_line(aes(y = fitted), color = "green") +
+  geom_line(aes(y = residual), color = "blue")
+```
 
 
 
+Laten we ook een simpel autoregressief model beschouwen met 1 lag. 
+```{r}
+ar_1 <- arima(estimation_sample$personnel, c(1,0,0))
+summary(ar_1)
+```
+Hoge R-squared,
+```{r}
+actuals_predict_2 <- tibble(
+  actual = estimation_sample$personnel[2:nrow(estimation_sample)],
+  fitted = ar_1$fitted.values,
+  residual = ar_1$residuals
+) %>%
+  mutate(n = 1:n())
 
+ggplot(actuals_predict_2, aes(x = n)) +
+  geom_line(aes(y = actual), color = "red") +
+  geom_line(aes(y = fitted), color = "green") +
+  geom_line(aes(y = residual), color = "blue")
+```
+We zien hier dat de residuals 
+
+
+
+## Deelvraag 8
+Hieronder de voorspellingen van de voorgaande modellen op de testdata.
+
+ARIMA(3,0,3)
+```{r}
+arima_forecast_1 <- forecast::Arima(y = test_sample$diff, order = c(3, 0, 3))
+summary(arima_forecast_1)
+```
+ARIMA(2,2,4)
+
+```{r}
+arima_forecast_2 <- forecast::Arima(y = test_sample$personnel, order = c(2, 2, 4))
+summary(arima_forecast_2)
+fitted(arima_forecast_2)
+```
+
+AR(1)
+```{r}
+ar_forecast <- predict(ar_1, n.ahead = 77)
+summary(ar_forecast)
+arima_forecast_3 <- forecast::Arima(y = test_sample$personnel, order = c(1, 0, 0))
+summary(arima_forecast_3)
+```
+
+## Deelvraag 9
 
 
