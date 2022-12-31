@@ -38,6 +38,7 @@ russia_losses_personnel <- read_csv("russia_losses_personnel.csv")
 Onderstaand figuur geeft ons een eerste blik op de data. Omdat we het hier hebben over cummulatieve personeelsverlizen zien we uitereaard een stijgende lijn in dit aantal. 
 ```{r}
 plot1 <- ggplot(russia_losses_personnel, aes(x=date, y=personnel)) +geom_line() + labs(title = "Cummulatieve dagelijkse personeelsverliezen")
+plot1
 ```
 
 
@@ -61,26 +62,26 @@ test_sample <- russia_losses_personnel %>% filter(date > '2022-10-03')
 ```
 
 
-We berkenen de (partitiele) autocorrelaties voor de cummulatieve personeelsverliezen(niveau):
+We berekenen de (partitiele) autocorrelaties voor de cummulatieve personeelsverliezen(niveau):
 ```{r}
 max_lag <- 15
 acf_pacf <- tibble(lag = 1:max_lag,
                    acf = acf(estimation_sample$personnel, max_lag)$acf[2:(max_lag + 1)],
                    pacf = pacf(estimation_sample$personnel, max_lag)$acf)
 ```
-We zien dat alle momenten significant zijn, wat typerend is voor niet stationaire data. We zouden nog een ADF (Augmented Dickey Fueller) test kunnen doen om dit te bevestigen.
+De ACF of autocorrelatie functie in bovenstaand figuur geeft de correlatie weer over de tijd tussen de verschillende momenten. We observeren dat de eerste 15 momenten significant en afnemend zijn. Dit wekt de suggestie dat er een lange termijn trend in de data zit en deze dus niet stationair is. We zouden nog een ADF (Augmented Dickey Fuller) test kunnen doen om dit te bevestigen.
 ```{r}
 adf.test(estimation_sample$personnel)
 ```
-Hoge p-waarde maakt het dat we de null hypothese niet kunnen verwerpen (personeelsverliezen zijn dus niet stationair)
+Hoge p-waarde maakt het dat we de null hypothese niet kunnen verwerpen (cummulatieve personeelsverliezen zijn dus niet stationair).
 
 
 ## Deelvraag 3
-We gaan verder met de verschillen. Omdat het aantal personeelsverliezen cummulatief is, en dus alleen maar zal groeien, is het handig om te kijken naar de groei of de verschillen in personeelsverliezen. Dit process heet 'detrending' of 'differencing' en wordt toegpast als er een duidelijke trend in de data zit. Deze hebben we in vorige vraag al berekend.
+We gaan verder met de verschillen. Omdat het aantal personeelsverliezen cummulatief is en een trend vertoont (zie ACF) gaan we een methode toepassen die 'detrending' of 'first differencing' wordt genoemd. Deze hebben we in vorige vraag al berekend.
 
 
 ## Deelvraag 4
-Laten we nu gaan kijken naar de (partitiele) autocorrelaties voor incrementele/dagelijkse personeelsverliezen
+Laten we nu gaan kijken naar de (partitiele) autocorrelaties voor incrementele/dagelijkse personeelsverliezen.
 
 ```{r}
 estimation_sample$diff[is.na(estimation_sample$diff)] <- 2800 
@@ -88,7 +89,7 @@ acf_pacf <- tibble(lag = 1:max_lag,
                    acf = acf(estimation_sample$diff, max_lag)$acf[2:(max_lag + 1)],
                    pacf = pacf(estimation_sample$diff, max_lag)$acf)
 ```
-
+De ACF toont dat de 1ste, 2de, 3de, 5de en 6de momenten significant zijn. De partitiele ACF toont dat de 1ste, 2de, 3de, 5de en 6de momenten significant zijn. Deze informatie kunnen we gebruiken bij het modelleren van deze data.
 
 
 ## Deelvraag 5
@@ -168,7 +169,7 @@ We zien een positieve skewness van 2.14, dit is hoog (skewness > 1). De uitschie
 
 
 ## Deelvraag 7
-In dit onderdeel gaan we twee alternatieve modellen bekijken. Allereerst beschouwen we een ARIMA model op cummulatieve personeelsverliezen. Wederom wordt de de 'auto.arima' functie gebruikt om het optimale model te bepalen. Let op: cummulatieve personeelsverliezen zijn niet stationair, dit hebben we hiervoor getoetst. Om deze reden wordt dit als argument meegegeven. In de onderstaande output staan de parameters die horen bij dit model:
+In dit onderdeel gaan we twee alternatieve modellen bekijken. Allereerst beschouwen we een ARIMA model op cummulatieve personeelsverliezen. Wederom wordt de 'auto.arima' functie gebruikt om het optimale model te bepalen. Let op: cummulatieve personeelsverliezen zijn niet stationair, dit hebben we hiervoor getoetst. Om deze reden wordt dit als argument meegegeven. In de onderstaande output staan de parameters die horen bij dit model:
 ```{r}
 stepwise_fit_2 <- auto.arima(estimation_sample$personnel, stationary = FALSE)
 summary(stepwise_fit_2)
@@ -192,8 +193,7 @@ ggplot(actuals_predict_2, aes(x = n)) +
   geom_line(aes(y = fitted), color = "green") +
   geom_line(aes(y = residual), color = "blue")
 ```
-
-Bovenstaand figuur geeft in het rood de werkelijke waardes terug, in het groen de geschatte en in het blauw de residuen.
+Bovenstaand figuur geeft in het rood de werkelijke waardes terug, in het groen de geschatte en in het blauw de residuen. Wederom zorgt de variantie aan het begin voor hogere residuen.
 
 Laten we ook een simpel autoregressief model beschouwen met 1 lag. In de onderstaande output staan de parameters die horen bij dit model:
 ```{r}
@@ -247,7 +247,6 @@ ggplot(actuals_forecast_1, aes(x = n)) +
   geom_line(aes(y = residual), color = "blue")
 ```
 
-
 ARIMA(2,2,4):
 
 ```{r}
@@ -297,7 +296,17 @@ ggplot(actuals_forecast_3, aes(x = n)) +
   geom_line(aes(y = residual), color = "blue")
 ```
 
+Het ARIMA(2,2,4) en het ARIMA(3,0,3) model hebben de laagste AIC, respectievelijk 955 en 977. Om een keuze te maken tussen deze twee modellen gaan we de residuen bekijken. We voeren een ADF toets uit om te controleren of deze stationair zijn.
 
+```{r}
+residuals(arima_forecast_1)
+```
+Voor het ARIMA(3,0,3) model krijgen we een p-waarde die groter is dan 0.05. We kunnen de null hypothese niet verwerpen en de residuen zijn dus niet stationair
+
+```{r}
+adf.test(residuals(arima_forecast_2))
+```
+Het ARIMA(2,2,4) model op cummulatieve personeelsverliezen heeft een p-waarde kleiner dan 0.05. Deze data is dus wel stationair en is ons voorkeursmodel. 
 
 ## Deelvraag 9
 ```{r}
@@ -307,16 +316,19 @@ fitted(arima_forecast_final)
 ```
 
 ```{r}
-# upper <- fitted(arima_forecast_final) + 1.96*sqrt(arima_forecast_final$sigma2)
-# lower <- fitted(arima_forecast_final) - 1.96*sqrt(arima_forecast_final$sigma2)
-# plot(russia_losses_personnel$diff, type="n", ylim=range(lower,upper))
-# polygon(c(time(russia_losses_personnel$date),rev(time(russia_losses_personnel$date))), c(upper,rev(lower)), col=rgb(0,0,0.6,0.2), border=FALSE)
-# lines(russia_losses_personnel$diff)
-# lines(fitted(arima_forecast_final),col='red')
-# out <- (russia_losses_personnel$diff < lower | russia_losses_personnel$diff > upper)
-# points(time(russia_losses_personnel$diff)[out], russia_losses_personnel$diff[out], pch=19)
+upper <- fitted(arima_forecast_final) + 1.96*sqrt(arima_forecast_final$sigma2)
+lower <- fitted(arima_forecast_final) - 1.96*sqrt(arima_forecast_final$sigma2)
+plot(russia_losses_personnel$diff, type="n", ylim=range(lower,upper))
+polygon(c(time(russia_losses_personnel$date),rev(time(russia_losses_personnel$date))), c(upper,rev(lower)), col=rgb(0,0,0.6,0.2), border=FALSE)
+lines(russia_losses_personnel$diff)
+lines(fitted(arima_forecast_final),col='red')
+out <- (russia_losses_personnel$diff < lower | russia_losses_personnel$diff > upper)
+points(time(russia_losses_personnel$diff)[out], russia_losses_personnel$diff[out], pch=19)
 ```
-In bovenstaande figuur zijn de voorspellingen in het rood, de werkelijke waardes in het zwart en de betrouwbaarheidsintervallen geplot. In de grafiek kunnen we, conform onze verwachtingen, aan het begin 
+In bovenstaande figuur zijn de voorspellingen in het rood, de werkelijke waardes in het zwart en de betrouwbaarheidsintervallen geplot. In de grafiek zien in het begin van de oorlog veel variantie in de personeelsverliezen. Dit maakt het voor het model lastig om voorpellingen te doen en dat zien we terug in de grafiek.
+
+
+
 
 ```{r}
 arima_forecast_final_1 <- forecast::Arima(y = russia_losses_personnel$personnel, order = c(2, 2, 4))
@@ -325,14 +337,14 @@ fitted(arima_forecast_final_1)
 ```
 
 ```{r}
-russia_losses_personnel$personnel[is.na(russia_losses_personnel$personnel)] <- 0 
-upper <- fitted(arima_forecast_final_1) + 1.96*sqrt(arima_forecast_final_1$sigma2)
-lower <- fitted(arima_forecast_final_1) - 1.96*sqrt(arima_forecast_final_1$sigma2)
+# russia_losses_personnel$personnel[is.na(russia_losses_personnel$personnel)] <- 0 
+upper <- log(fitted(arima_forecast_final_1) + 1.96*sqrt(arima_forecast_final_1$sigma2))
+lower <- log(fitted(arima_forecast_final_1) - 1.96*sqrt(arima_forecast_final_1$sigma2))
 plot(russia_losses_personnel$personnel, type="n", ylim=range(lower,upper))
 polygon(c(time(russia_losses_personnel$date),rev(time(russia_losses_personnel$date))), c(upper,rev(lower)), col=rgb(0,0,0.6,0.2), border=FALSE)
-lines(russia_losses_personnel$personnel)
-lines(fitted(arima_forecast_final_1),col='red')
-out <- (russia_losses_personnel$personnel < lower | russia_losses_personnel$personnel > upper)
+lines(log(russia_losses_personnel$personnel))
+lines(log(fitted(arima_forecast_final_1)),col='red')
+out <- (log(russia_losses_personnel$personnel) < lower | log(russia_losses_personnel$personnel) > upper)
 points(time(russia_losses_personnel$personnel)[out], russia_losses_personnel$personnel[out], pch=19)
 ```
 

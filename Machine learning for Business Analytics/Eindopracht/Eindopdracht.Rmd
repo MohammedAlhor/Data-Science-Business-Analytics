@@ -1,0 +1,85 @@
+---
+title: "Eindopdracht"
+author: "Mohammed Al Hor"
+date: "2022-12-31"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Libraries
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(stats)
+library(factoextra)
+library(ca)
+```
+
+
+
+
+## Opdracht 1: World Values Survey
+1) Probeer door middel van cluster analyse groepen van mensen te vinden die vergelijkbare antwoorden 
+hebben gegeven op de 45 vragen. 
+a. Normaliseer de data. (Dus: Herschaal alle antwoorden zodat deze van 0 -1 lopen).
+
+
+```{r}
+#inladen data
+load("~/Data-Science-Business-Analytics/Data/WorldValueSurveyW7_2022.RData")
+```
+
+```{r}
+# Normaliseren van de data tussen 0 en 1.
+
+normalize <- function(dataframe) {
+  (dataframe - min(dataframe)) / (max(dataframe) - min(dataframe))
+}
+
+normalized_data <- normalize(df.train[,-1])
+
+```
+
+
+
+b. Gebruik kmeans om deze data te clusteren. Leg uit hoe u tot een uiteindelijke keuze voor K komt. 
+
+To figure out what the optimal K is to use in kmeans clustering we use the 'Elbow' method from the factoextra package. This technique or method runs k-means clustering on the dataset for a range of k-values and computes an average score for these clusters. These average scores are plotted, making it possible to visually determine the best value for K.
+
+```{r}
+fviz_nbclust(scale(normalized_data), kmeans, method = "wss") + labs(subtitle = "Elbow Method") 
+```
+
+In an ideal world this plot above would look like an arm with a clear elbow at K, however the graph shown above does not seem to have a clear or sharp elbow. It looks like K sits at 2 or 3. Let's do kmeans on k is 2 and 3.
+
+```{r}
+k = 2
+
+kmeans_2 <- kmeans(normalized_data[,-1], centers = k)
+?kmeans
+?scale()
+
+```
+
+
+
+
+c. Beschrijf uw bevindingen; interpreteer uw resultaten
+d. Ongeacht wat u bij b heeft gedaan, doe kmeans met 5 clusters op deze data en interpreteer de 
+clusters
+```{r}
+k = 2
+
+kmeans_5 <- kmeans(normalized_data[,-1], centers = 5)
+```
+
+e. Doe correspondentie analyse op de kruistabel die u verkrijgt wanneer u kijkt naar de verdelingen 
+over de landen voor de 5 gevonden clusters
+f. Beschrijf uw bevindingen; interpreteer het plaatje. 
+2) Gebruik nu hierarchische cluster analyse om clusters van waarnemingen te vinden.
+a. Kies een afstandsmaat en een linkage method, en motiveer uw keuzes.  
+b. Kies 4 clusters en interpreteer deze clusters.
