@@ -63,6 +63,8 @@ kmeans_2 <- kmeans(normalized_data[,-1], centers = k)
 ?kmeans
 ?scale()
 
+scale(normalized_data)
+
 ```
 
 

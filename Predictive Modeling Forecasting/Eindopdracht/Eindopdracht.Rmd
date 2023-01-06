@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## R Markdown
 ```{r}
-#libs
+#Libraries
 library(dplyr)
 library(readr)
 library(ggplot2)
@@ -27,7 +27,7 @@ library(car)
 ```
 
 ## Deelvraag 1,2 
-Deze zeer relevante dataset bevat de dagelijkse personeelsverliezen aan Russische kant van de oorlog in Ukraine. In dit rapport gaan we kijken naar EDA (Exploratory Data Analysis) doen en daarna een stukje forecasting proberen te doen op deze data. Verschillende visualisaties en modellen zullen aan bod komen. Deze modellen gaan we met elkaar vergelijken om uiteindelijk het beste model uit te kiezen en deze te gebruiken om voorspellingen te doen.
+Deze zeer relevante dataset bevat de dagelijkse personeelsverliezen aan Russische kant van de oorlog in Ukraine. In dit rapport komen de volgende onderwerpen aan bod: (I) EDA (Exploratory Data Analysis), (II) forecasting waarbij meerdere modellen worden beschouwd. Deze modellen gaan we met elkaar vergelijken om uiteindelijk het beste model uit te kiezen en deze te gebruiken om voorspellingen te doen.
 Inladen van de data:
 ```{r}
 setwd("~/Data-Science-Business-Analytics/Data")
@@ -45,6 +45,7 @@ plot1
 De eerste verschillen (first differences) worden berekend, zodat we deze kunnen visualizeren.
 ```{r}
 russia_losses_personnel <- russia_losses_personnel %>% mutate(diff = personnel - lag(personnel))
+russia_losses_personnel$diff[is.na(russia_losses_personnel$diff)] <- 2800 
 ```
 
 Cummulatieve en dagelijkse/incrementel personeelsverliezen onder elkaar.
@@ -53,9 +54,9 @@ require(gridExtra)
 plot2 <- ggplot(russia_losses_personnel, aes(x=date, y=diff)) +geom_point() + geom_smooth() + labs(title = "Incrementele dagelijkse personeelsverliezen")
 grid.arrange(plot1, plot2, ncol=1)
 ```
-We observeren een aanzienlijke variantie wat betreft personeelsverliezen in de eerste dagen van de oorlog. Een verklaring voor deze variantie is het feit dat er in de eerste dagen de personeelsverliezen niet dagelijks werden geupdated. We zien voor sommige dagen nul personeelsverliezen die in de opvolgende dagen worden overgecompenseerd. 
+We observeren een aanzienlijke variantie wat betreft personeelsverliezen in de eerste dagen van de oorlog. Een verklaring voor deze variantie is het feit dat er in de eerste dagen de personeelsverliezen niet dagelijks werden geupdated. We zien voor sommige dagen nul personeelsverliezen die in de opvolgende dagen worden overgecompenseerd. Verder zien we dat de trend die we voorheen zagen in de cummulatieve personeelsverliezen grotendeels is verdwenen, de data lijkt stationair. Dit zullen we in de volgende stappen gaan toetsen.
 
-Laten we de dataset opdelen in een training en test set.
+De dataset wordt opgedeeld in een 'estimation sample', die we gaan gebruiken om de modellen te trainen en een 'test sample' die we gaan gebruiken om de modellen te evalueren.
 ```{r}
 estimation_sample <- russia_losses_personnel %>% filter(date <= '2022-10-03')
 test_sample <- russia_losses_personnel %>% filter(date > '2022-10-03')
@@ -73,18 +74,18 @@ De ACF of autocorrelatie functie in bovenstaand figuur geeft de correlatie weer 
 ```{r}
 adf.test(estimation_sample$personnel)
 ```
-Hoge p-waarde maakt het dat we de null hypothese niet kunnen verwerpen (cummulatieve personeelsverliezen zijn dus niet stationair).
+De hoge p-waarde maakt het dat we de null hypothese niet kunnen verwerpen. Conform onze verwachtingen zijn de cummulatieve personeelsverliezen niet stationair.
 
 
 ## Deelvraag 3
-We gaan verder met de verschillen. Omdat het aantal personeelsverliezen cummulatief is en een trend vertoont (zie ACF) gaan we een methode toepassen die 'detrending' of 'first differencing' wordt genoemd. Deze hebben we in vorige vraag al berekend.
+Omdat cummulatieve personeelsverliezenniet stationair zijn gaan we door met de verschillen. We passen hiervoor een methode toe die 'detrending' of 'first differencing' wordt genoemd. Dit stukje feature engineering hebben we in de vorige stappen al gedaan.
 
 
 ## Deelvraag 4
 Laten we nu gaan kijken naar de (partitiele) autocorrelaties voor incrementele/dagelijkse personeelsverliezen.
 
 ```{r}
-estimation_sample$diff[is.na(estimation_sample$diff)] <- 2800 
+max_lag <- 15
 acf_pacf <- tibble(lag = 1:max_lag,
                    acf = acf(estimation_sample$diff, max_lag)$acf[2:(max_lag + 1)],
                    pacf = pacf(estimation_sample$diff, max_lag)$acf)
@@ -93,7 +94,7 @@ De ACF toont dat de 1ste, 2de, 3de, 5de en 6de momenten significant zijn. De par
 
 
 ## Deelvraag 5
-Voordat we met het leuke werk gaan beginnen moeten we we eerst een check doen of onze data stationair is. Dit houdt in dat de mean en de variantie constant moeten zijn en er geen seizoenseffecten in mogen zitten. Hiervoor gebruiken we de ADF, ofwel Augmented Dickey Fueller test.
+Voordat we met het leuke werk gaan beginnen moeten we we eerst een check doen of onze data stationair is. Dit houdt in dat de mean en de variantie constant moeten zijn en er geen seizoenseffecten in mogen zitten. Hiervoor gebruiken we de ADF, ofwel Augmented Dickey Fuller test.
 
 ```{r}
 adf.test(estimation_sample$diff)
@@ -102,14 +103,16 @@ adf.test(estimation_sample$diff)
 P-waarde is kleiner dan 0.05, we kunnen de null hypothese verwerpen en aannemen dat de data stationair is.
 
 
-Omdat er geen 'cut off' point zit in beide grafieken kunnen we geen definitieve keuze maken tussen een AR of MA model. Ons eerste model wordt dus een ARMA model. De parameters voor dit model gaan we schatten door middel van het 'forecast' package. De 'auto.arima' functie in dit package geeft het beste model terug op basis van AIC. Het beste model (laagste AIC) is een ARIMA(3,0,3) model. De parameters worden weergegeven in de onderstaande output:
+Omdat er geen 'cut off' point zit in beide grafieken kunnen we geen definitieve keuze maken tussen een AR of MA model. Ons eerste model wordt dus een combinatie van deze twee (ARMA of ARIMA model). De parameters voor dit model gaan we schatten door middel van het 'forecast' package. De 'auto.arima' functie in dit package geeft het beste model terug op basis van AIC. Het beste model (laagste AIC) is een ARIMA(5,1,3) model. De parameters worden weergegeven in de onderstaande output:
 
 ```{r}
-stepwise_fit_1 <- auto.arima(estimation_sample$diff, stationary = TRUE)
+stepwise_fit_1 <- auto.arima(estimation_sample$diff)
 summary(stepwise_fit_1)
-arma_1 <- arima(estimation_sample$diff, c(3,0,3))
+arma_1 <- arima(estimation_sample$diff, c(5,1,3))
 cf <- coef(arma_1) # coefficienten ophalen
 ```
+Dit ARIMA(5,1,3) model wekt de suggestie dat de 'diff' variable toch niet stationair is. Ondanks de resultaten van de ADF toets, wordt in het ARIMA model een trend gevonden en hiervoor gecorrigeerd. 
+
 ## Deelvraag 6
 In dit onderdeel gaan we een 'deep-dive' doen op dit model, eerst kijken we naar de residuals ten op zichte van de werkelijke waardes en zetten we deze in een grafiek.
 
@@ -129,15 +132,17 @@ ggplot(actuals_predict, aes(x = n)) +
   geom_line(aes(y = residual), color = "blue") + labs(title = "Actual vs. Fitted values") 
 ?geom_line()
 ```
-Bovenstaand figuur geeft in het rood de werkelijke waardes terug, in het groen de geschatte en in het blauw de residuen.
+Bovenstaand figuur geeft in het rood de werkelijke waardes terug, in het groen de geschatte en in het blauw de residuen. We observeren hogere residuen aan het begin van de oorlog, dit is in lijn met het feit dat aan het begin de personeelsverliezen niet dagelijks werden gerapporteerd.
 
-Laten we hierop wat diagnostische testen doen. We beginnen met de Ljung Box test om te checken voor residual autocorrelatie. De null hypothese van is dat de data onafhankelijk zijn verdeeld. 
+Laten we hierop wat diagnostische testen doen. We beginnen met de Ljung Box test om te checken voor residual autocorrelatie met een lag van 1, omdat we geinteresseerd zijn in de autocorrelatie tussen elke lag. De null hypothese van is dat de data onafhankelijk zijn verdeeld. 
+    H0: The data are independently distributed 
+    Ha: The data are not independently distributed; they exhibit serial correlation.
 ```{r}
-lb_test_result <- Box.test(actuals_predict$residual, lag = 1, type = c("Ljung-Box"),) # fit
+
+lb_test_result <- Box.test(actuals_predict$residual, lag = 1, type = c("Ljung-Box"), fitdf = -7 )# h-p-q = 1-5-3) 
 lb_test_result
-?Box.test
 ```
-Met een p-waarde van 0.4652 kunnen we de null-hypothese niet verwerpen. De residuen zijn onafhankelijk verdeeld en dit is wat we willen hebben voor een correct model.
+Omdat we deze toets toepassen op de residuen van een ARIMA model is de hyptohese die eigenlijk toetsen dat de residuen van het ARIMA model geen aurocorrelatie vertonen. Met een p-waarde van 0.7295 kunnen we de null-hypothese niet verwerpen. De residuen vertonen dus geen autocorrelatie.
 
 We kunnen aan de hand van wat getallen en grafieken een kijkje nemen naar de normaliteit van de residuen.
 
@@ -159,13 +164,14 @@ Standaard deviatie:
 ```{r}
 sd(actuals_predict$residual)
 ```
-we zien een standaard deviatie van ongeveer 218.
+we zien een standaard deviatie van ongeveer 254.
+
 Skewness:
 
 ```{r}
 skewness(actuals_predict$residual)
 ```
-We zien een positieve skewness van 2.14, dit is hoog (skewness > 1). De uitschieters in bovenstaande histogram zijn hier waarschijnlijk de oorzaak van.
+We zien een negatieve skewness van -1.11, dit is relatief hoog (skewness > 1). De uitschieters in bovenstaande histogram zijn hier waarschijnlijk de oorzaak van.
 
 
 ## Deelvraag 7
@@ -200,7 +206,7 @@ Laten we ook een simpel autoregressief model beschouwen met 1 lag. In de onderst
 ar_1 <- arima(estimation_sample$personnel, c(1,0,0))
 summary(ar_1)
 ```
-Hieronder worden de residuen in een tabel gezet en geplot in een figuur.
+Onderstaande grafiek geeft de werkelijke waardes weer in het rood, de geschatte waardes in het groen en de residuen in het blauw.
 ```{r}
 actuals_predict_3 <- tibble(
   actual = estimation_sample$personnel[1:nrow(estimation_sample)],
@@ -216,8 +222,7 @@ ggplot(actuals_predict_3, aes(x = n)) +
   geom_line(aes(y = fitted), color = "green") +
   geom_line(aes(y = residual), color = "blue")
 ```
-Laten we de AIC bekijken van de verschillende modellen. Het AR(1) model heeft een AIC van 3265, het ARIMA(2,2,4) model een AIC van 3032 en het eerste ARMA(3,0,3) model heeft een AIC van 3029. Dit zit redelijk dicht bij elkaar, maar het ARMA(3,0,3) model heeft de laagste AIC. We kiezen dus voor nu voor het ARMA(3,0,3) model. Verder zien we voor de overige modellen dat de geschatte waardes allemaal heel dicht liggen bij de werkelijke waardes. Hoewel deze modellen op de huidige data goede voorspellingen kunnen doen, zou dit ook een geval van 'overfitting' kunnen zijn.
-
+Laten we de AIC bekijken van de verschillende modellen. Het AR(1) model heeft een AIC van 3265, het ARIMA(2,2,4) model een AIC van 3009 en het eerste ARIMA(5,1,3) model heeft een AIC van 3085. Dit zit redelijk dicht bij elkaar, maar het ARMA(2,2,4) model heeft de laagste AIC en dus de beste fit. We kiezen  voor nu dus voor het ARIMA(2,2,4) model. De grafiek van het ARIMA(2,2,4) model op cummulatieve personeelsverliezen vertoont wel symptomen van overfitting, de geschatte waarden zitten heel dicht bij de werkelijke waarden. In het volgende onderdeel gaan we dit toetsen op de test data door te kijken naar de accuracy measures. 
 
 
 ## Deelvraag 8
@@ -226,40 +231,48 @@ Hieronder de voorspellingen van de voorgaande modellen op de testdata.
 ARIMA(3,0,3):
 
 ```{r}
-arima_forecast_1 <- forecast::Arima(y = test_sample$diff, order = c(3, 0, 3))
-summary(arima_forecast_1)
-fitted(arima_forecast_1)
+arima_test_1 <- Arima(test_sample$diff, model = arma_1)
+arima_test_1
+accuracy(arima_test_1)
 ```
-
+                   ME     RMSE      MAE        MPE      MAPE      MASE        ACF1
+Training set 6.779833 116.1027 95.24856 0.01139778 0.1224605 0.1908441 -0.01086729
 ```{r}
 actuals_forecast_1 <- tibble(
   actual = test_sample$diff[1:nrow(test_sample)],
-  fitted = fitted.values(arima_forecast_1),
-  residual = residuals(arima_forecast_1)
+  fitted = fitted.values(arima_test_1),
+  residual = residuals(arima_test_1)
 ) %>%
   mutate(n = 1:n())
 ```
 
+
+Onderstaande grafiek geeft de werkelijke waardes weer in het rood, de geschatte waardes in het groen en de residuen in het blauw.
 ```{r}
 ggplot(actuals_forecast_1, aes(x = n)) +
   geom_line(aes(y = actual), color = "red") +
   geom_line(aes(y = fitted), color = "green") +
   geom_line(aes(y = residual), color = "blue")
+
 ```
+Dit model heeft een AIC van 999 en de accuracy metrieken zijn als volgt:
+```{r}
+accuracy(arima_test_1)
+```
+
 
 ARIMA(2,2,4):
 
 ```{r}
-arima_forecast_2 <- forecast::Arima(y = test_sample$personnel, order = c(2, 2, 4))
-summary(arima_forecast_2)
-fitted(arima_forecast_2)
+arima_test_2 <- Arima(test_sample$personnel, model = arma_2)
+arima_test_2
 ```
-
+Onderstaande grafiek geeft de werkelijke waardes weer in het rood, de geschatte waardes in het groen en de residuen in het blauw.
 ```{r}
 actuals_forecast_2 <- tibble(
   actual = test_sample$personnel[1:nrow(test_sample)],
-  fitted = fitted.values(arima_forecast_2),
-  residual = residuals(arima_forecast_2)
+  fitted = fitted.values(arima_test_2),
+  residual = residuals(arima_test_2)
 ) %>%
   mutate(n = 1:n())
 ```
@@ -270,21 +283,33 @@ ggplot(actuals_forecast_2, aes(x = n)) +
   geom_line(aes(y = fitted), color = "green") +
   geom_line(aes(y = residual), color = "blue")
 ```
-
+Dit model heeft een AIC van 982 en de accuracy metrieken zijn als volgt:
+```{r}
+accuracy(arima_test_2)
+```
 
 AR(1):
 
 ```{r}
+ar_test_1 <- Arima(test_sample$personnel, model = ar_1)
+ar_test_1
+
 arima_forecast_3 <- forecast::Arima(y = test_sample$personnel, order = c(1, 0, 0), method = 'ML')
 summary(arima_forecast_3)
 fitted(arima_forecast_3)
+
+```
+Dit model heeft een AIC van 1210 en de accuracy metrieken zijn als volgt:
+```{r}
+accuracy(ar_test_1)
 ```
 
+Onderstaande grafiek geeft de werkelijke waardes weer in het rood, de geschatte waardes in het groen en de residuen in het blauw.
 ```{r}
 actuals_forecast_3 <- tibble(
   actual = test_sample$personnel[1:nrow(test_sample)],
-  fitted = fitted.values(arima_forecast_3),
-  residual = residuals(arima_forecast_3)
+  fitted = fitted.values(ar_test_1),
+  residual = residuals(ar_test_1)
 ) %>%
   mutate(n = 1:n())
 ```
@@ -296,57 +321,38 @@ ggplot(actuals_forecast_3, aes(x = n)) +
   geom_line(aes(y = residual), color = "blue")
 ```
 
-Het ARIMA(2,2,4) en het ARIMA(3,0,3) model hebben de laagste AIC, respectievelijk 955 en 977. Om een keuze te maken tussen deze twee modellen gaan we de residuen bekijken. We voeren een ADF toets uit om te controleren of deze stationair zijn.
 
-```{r}
-residuals(arima_forecast_1)
-```
-Voor het ARIMA(3,0,3) model krijgen we een p-waarde die groter is dan 0.05. We kunnen de null hypothese niet verwerpen en de residuen zijn dus niet stationair
-
-```{r}
-adf.test(residuals(arima_forecast_2))
-```
-Het ARIMA(2,2,4) model op cummulatieve personeelsverliezen heeft een p-waarde kleiner dan 0.05. Deze data is dus wel stationair en is ons voorkeursmodel. 
+Modelkeuze:
+Het ARIMA(2,2,4) en het ARIMA(5,1,3) model hebben de laagste AIC, respectievelijk 982 en 999. Ook op de accuracy metrieken die we hebben berekend scoort het ARIMA(2,2,4) model op cummlatieve personeelsverliezen iets beter. Dit model heeft voor nu dus de voorkeur. Echter zitten deze metrieken dicht bij elkaar, om die reden zullen we in de volgende vraag beide modellen beschouwen.
 
 ## Deelvraag 9
+Het ARIMA(5,1,3) model wordt nu opnieuw geschat op de gehele dataset en er wordt een voorspelling gedaan op de opvolgende 180 dagen.
 ```{r}
-arima_forecast_final <- forecast::Arima(y = russia_losses_personnel$diff, order = c(3, 0, 3))
-summary(arima_forecast_final)
-fitted(arima_forecast_final)
+arima_forecast_final_1 <- forecast::Arima(y = russia_losses_personnel$diff, order = c(5, 1, 3))
+autoplot(forecast(arima_forecast_final_1, h=180), ylab='Incrementele personeelsverliezen', main='') + theme_bw()
 ```
+Bovenstaande grafiek toont de voorspellingen voor de opvolgende 180 dagen, met in het donkerblauw de 95% betrouwbaarheids intervallen en in het lichtblauw de 80% betrouwbaarheidsintervallen. 
 
+Hieronder de beschrijvende statistieken van het ARIMA(5,1,3) model:
 ```{r}
-upper <- fitted(arima_forecast_final) + 1.96*sqrt(arima_forecast_final$sigma2)
-lower <- fitted(arima_forecast_final) - 1.96*sqrt(arima_forecast_final$sigma2)
-plot(russia_losses_personnel$diff, type="n", ylim=range(lower,upper))
-polygon(c(time(russia_losses_personnel$date),rev(time(russia_losses_personnel$date))), c(upper,rev(lower)), col=rgb(0,0,0.6,0.2), border=FALSE)
-lines(russia_losses_personnel$diff)
-lines(fitted(arima_forecast_final),col='red')
-out <- (russia_losses_personnel$diff < lower | russia_losses_personnel$diff > upper)
-points(time(russia_losses_personnel$diff)[out], russia_losses_personnel$diff[out], pch=19)
-```
-In bovenstaande figuur zijn de voorspellingen in het rood, de werkelijke waardes in het zwart en de betrouwbaarheidsintervallen geplot. In de grafiek zien in het begin van de oorlog veel variantie in de personeelsverliezen. Dit maakt het voor het model lastig om voorpellingen te doen en dat zien we terug in de grafiek.
-
-
-
-
-```{r}
-arima_forecast_final_1 <- forecast::Arima(y = russia_losses_personnel$personnel, order = c(2, 2, 4))
 summary(arima_forecast_final_1)
-fitted(arima_forecast_final_1)
 ```
 
+
+Het ARIMA(2,2,4) model wordt nu opnieuw geschat op de gehele dataset en er wordt een voorspelling gedaan op de opvolgende 180 dagen.ARIMA(2,2,4)
+
 ```{r}
-# russia_losses_personnel$personnel[is.na(russia_losses_personnel$personnel)] <- 0 
-upper <- log(fitted(arima_forecast_final_1) + 1.96*sqrt(arima_forecast_final_1$sigma2))
-lower <- log(fitted(arima_forecast_final_1) - 1.96*sqrt(arima_forecast_final_1$sigma2))
-plot(russia_losses_personnel$personnel, type="n", ylim=range(lower,upper))
-polygon(c(time(russia_losses_personnel$date),rev(time(russia_losses_personnel$date))), c(upper,rev(lower)), col=rgb(0,0,0.6,0.2), border=FALSE)
-lines(log(russia_losses_personnel$personnel))
-lines(log(fitted(arima_forecast_final_1)),col='red')
-out <- (log(russia_losses_personnel$personnel) < lower | log(russia_losses_personnel$personnel) > upper)
-points(time(russia_losses_personnel$personnel)[out], russia_losses_personnel$personnel[out], pch=19)
+arima_forecast_final_2 <- forecast::Arima(y = russia_losses_personnel$personnel, order = c(2, 2, 4))
+autoplot(forecast(arima_forecast_final_2, h=180), ylab='Cummulatieve personeelsverliezen', main='') + theme_bw()
 ```
+Bovenstaande grafiek toont de voorspellingen voor de opvolgende 180 dagen, met in het donkerblauw de 95% betrouwbaarheids intervallen en in het lichtblauw de 80% betrouwbaarheidsintervallen. 
+
+Hieronder de beschrijvende statistieken van het ARIMA(5,1,3) model:
+```{r}
+summary(arima_forecast_final_2)
+```
+
+
 
 
 
