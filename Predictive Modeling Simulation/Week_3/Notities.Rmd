@@ -1,0 +1,13 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+pakketje wordt ingehaald door een ander pakketje
+later zijn aangekomen maar eerder klaar zijn, nieuwe begintijd wordt de laatste tijd van het pakketje. 
+Random walk.
+Monte carlo simulation wordt gebruikt bij een statisch probleem
+
+Discrete event simulation DES, theoretisch framework:
+Dynamische simualatie -> systeem heeft een state, alles wat van belang is om het systeem te voorspellen
+voorbeeld: storingen/onderhoud. 
