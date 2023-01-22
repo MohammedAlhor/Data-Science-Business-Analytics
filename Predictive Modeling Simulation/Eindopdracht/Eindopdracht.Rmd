@@ -1,0 +1,155 @@
+---
+title: "Eindopdracht"
+author: "Mohammed Al Hor"
+date: "2023-01-19"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(simmer)
+library(simmer.plot)
+library(dplyr)
+library(tidyverse)
+```
+
+```{r include=FALSE}
+set.seed(42)
+# Set up the simulation environment
+env <- simmer("parcel depot")
+env
+
+mu_1 = 5
+sd_1 = 1
+mu_2 = 8
+sd_2 = 2
+lambda=10
+rate = 1/lambda # the rate is the 1 divided by the time between each parcel
+
+
+parcel <- trajectory("parcel's path") %>%
+  seize("express worker", 1) %>% # checking in of parcels by express worker
+  timeout(function() rnorm(1, mu_1, sd_1)) %>% # mean of 5 with sd of 1
+  release("express worker", 1) %>%
+  
+  seize("admin worker", 1) %>% # preparing the parcel for shipping by admin worker
+  timeout(function() rnorm(1, mu_2, sd_2)) %>% # mean of 8 with sd of 2
+  release("admin worker", 1)
+
+env %>%
+  add_resource("express worker", 1) %>%
+  add_resource("admin worker", 2) %>%
+  add_generator("parcel", parcel, function() rexp(1, rate))
+
+env %>% run(until=6600) # we run the simulation for 6600 minutes (10 working days)
+env %>% get_mon_arrivals()
+env %>% get_mon_resources()
+
+plot(get_mon_resources(env))
+env_per_user <- get_mon_arrivals(env, per_resource = TRUE)
+```
+
+
+## 2 (a) The mean, and standard deviation of the checking time, admin time, wait time before checking, wait time before admin, and total throughput time of a parcel.
+      
+Express worker mean and sd of checking time in hours:
+```{r}
+express_worker <- env_per_user %>% filter(resource == 'express worker')
+
+#calculate the mean and sd:
+mean(express_worker$activity_time)/60
+sd(express_worker$activity_time)/60
+```
+
+Express worker mean and sd of wait time in hours:
+
+```{r}
+express_worker_wait <- express_worker$end_time - express_worker$start_time - express_worker$activity_time
+mean(express_worker_wait)/60
+sd(express_worker_wait)/60
+```
+
+Admin worker mean and sd of checking time in hours:
+
+```{r}
+admin_worker <- env_per_user %>% filter(resource == 'admin worker')
+#calculate the mean and sd:
+mean(admin_worker$activity_time)/60
+sd(admin_worker$activity_time)/60
+```
+
+Admin worker mean and sd of wait time in hours:
+
+```{r}
+admin_worker_wait <- admin_worker$end_time - admin_worker$start_time - admin_worker$activity_time
+mean(express_worker_wait)/60
+sd(express_worker_wait)/60
+```
+
+Total throughput of a parcel in hours:
+
+```{r}
+total_throughput <- env_per_user %>% group_by(name) %>% 
+  summarise(min_start_time = min(start_time), max_end_time = max(end_time)) %>%
+  mutate(throughput = max_end_time - min_start_time)
+
+mean(total_throughput$throughput)/60
+sd(total_throughput$throughput)/60
+```
+
+
+## 2 (b) A density histogram of the total throughput, checking time, admin time, wait time before checking and wait time before admin in the simulation.
+All of these values have been converted to hours
+Histogram of total throughput:
+```{r}
+hist(total_throughput$throughput/60)
+```
+
+Histogram of checking time
+```{r}
+hist(express_worker$activity_time/60)
+```
+
+Histogram of admin time
+```{r}
+hist(admin_worker$activity_time/60)
+```
+
+Histogram of wait time before checking
+```{r}
+hist(express_worker_wait/60)
+```
+
+Histogram of wait time before admin
+```{r}
+hist(admin_worker_wait/60)
+```
+
+
+## (c) The proportion of parcels sent out in time. Please also state the simulated amount of parcels and the runtime.
+
+Proportion of parcels sent out on time:
+```{r}
+shipping_time <- 2*11*60
+shipped_in_time <- total_throughput %>% filter(throughput<= shipping_time)
+nrow(shipped_in_time)/nrow(total_throughput)*100
+```
+
+Total number or parcels simulated:
+```{r}
+nrow(total_throughput)
+```
+
+Total runtime in hours:
+```{r}
+sum(total_throughput$throughput)/60
+```
+
+
+
+
+
+
