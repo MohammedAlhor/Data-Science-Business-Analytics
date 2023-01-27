@@ -1,0 +1,70 @@
+---
+title: "Voorbeeld"
+author: ""
+date: ""
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Met deze opties voorkom je dat nieuwe code blokken met code/warnings en al worden weergegeven in je document
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+library(tidyverse)
+library(lubridate)
+```
+
+
+```{r}
+years <- c(2021, 2022)
+```
+
+
+## Introductie
+// Schrijf je eigen introductie, dit is een voorbeeld! //
+In dit rapport worden kameractiviteiten van tweedekamerleden in `r years[1]` en `r years[2]` geanalyseerd. Hieronder vallen: schriftelijke vragen, mondelinge vragen, amendementen en moties.
+
+
+
+```{r}
+# Inlezen data
+# Met behulp van de .. ga je een folder 'omhoog' in de mappenstructuur van je project.
+# Een Rmd wordt bij knitten altijd gedraaid met de eigen locatie als working directory, ongeacht wat je verder had ingesteld.
+members<- readRDS("../clean_data/members.Rds")
+
+# Lees en filter activities voor 2021 en 2022 (dat mag je zelf doen!)
+
+
+```
+
+## Aantal kamerleden per partij
+
+Voorbeeld tabel
+
+```{r paged.print=TRUE}
+members %>% count(party, sort = TRUE, name = 'aantal kamerleden') %>%
+  rename(partij = party) %>%
+  knitr::kable(format = "html", caption = "Aantal leden per partij in de Tweede Kamer") %>%
+  kableExtra::kable_classic()
+```
+
+
+Hier komt wat uitleg over de grafiek ter introductie.
+
+```{r, fig.width=10, fig.height=7}
+members %>% count(party) %>%
+  arrange(n) %>%
+  mutate(party = factor(party, levels = party)) %>%
+  ggplot() + 
+  geom_col(aes(x = party,  y = n), fill="lightblue") +
+  geom_label(aes(x = party, y = n, label = n)) +
+  coord_flip() +
+  theme(panel.background = element_rect(fill="white",color = "black"),
+        panel.grid.major = element_line(color = "white"),
+        panel.grid.minor = element_line(color = "white")) +
+  labs(title="Aantal leden in de Tweede Kamer per partij", x="", y="Aantal kamerleden")
+
+```
+

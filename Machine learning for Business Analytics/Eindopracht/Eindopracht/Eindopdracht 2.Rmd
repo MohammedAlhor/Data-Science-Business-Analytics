@@ -1,0 +1,158 @@
+---
+title: "Eindopdracht 2"
+author: "Mohammed Al Hor"
+date: "2023-01-22"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load libraries
+library(caret)
+library(fastDummies)
+library(dplyr)
+library(caret)
+library(xgboost)
+```
+
+## Opdracht 2: Hotel Bookings
+
+1. Welke data preparatie stappen u neemt (en waarom).
+
+First, we load the data and check if there are missing values. 
+```{r}
+# We load the data
+load("~/Data-Science-Business-Analytics/Data/bookings.RData")
+# checken
+sum(is.na(bookings))
+# no missing values
+```
+There are no missing values in the data, let's move on.
+
+First off, we data contains columns with categorical variables; 'is_canceled', 'country' and 'market_segment','is_repeated_guest'. The remaining numeric variables have are on different scales and thus must be scaled before analysis. The following section of the data preparation deals with this.
+
+
+```{r}
+set.seed(123)
+
+bookings_prepped <- dummy_cols(bookings, select_columns = c("country", "market_segment", "is_repeated_guest")) 
+bookings_prepped <- bookings_prepped[, -c(10:12)] 
+bookings_prepped[,2:16] <- scale(bookings_prepped[,2:16]) 
+```
+
+The aforementioned categorical variables are converted to dummy variables and the remaining numeric variables are scaled. 
+
+In this last step of data preparation the data set is split into a training and test set. The training set will be used to train the model, whereas the test set will be used to evaluate the model. 
+
+```{r}
+split <- createDataPartition(bookings_prepped$is_canceled, p = 0.6, list = FALSE)
+training <- bookings_prepped[split,]
+test <- bookings_prepped[-split,]
+```
+
+We use random sampling and we end up with a training set contains that contains 60% of the observations (11879) and a test set that contains 40% (7918) of the observations.
+
+2. Welke methode(n) u gebruikt en, indien van toepassing, hoe u tot uw uiteindelijke voorspelmodel(len) komt (dus: keuze van parameters, etc.).
+
+K-nearest neighbours:
+
+Now that we did the data preparation, the fun can begin. The first method we consider is of course the 'lazy' learner method. KNN (K-nearest neighbour) is a simple algorithm that stores all available cases and classifies new data using similarity measures. KNN is quick and thus we start off with this method. We perform this method on the training data, try different values of K (amount of nearest neighbours we should consider) using cross-validation and make predictions on the test data. 
+Now that we have our KNN models we can start looking the different values for K and pick the best one.
+```{r}
+# Cross validation 
+control <- trainControl(method = "cv", number = 5)
+
+knn <- train(is_canceled ~ ., data = training, method = "knn", 
+                   trControl = control, tuneGrid = data.frame(k = 1:15))
+
+```
+
+The plot below shows the accuracy of the model across different values of K. This 'optimal' value is set and used to train our definitive model. 
+
+```{r, include=TRUE, message=FALSE, echo=FALSE, fig.height=3.5, fig.align='center'}
+# Plot that shows the accuracy across different values of K
+plot(knn)
+
+# The optimal value for K is set and used to train the model.
+k <- knn$bestTune$k
+knn <- train(is_canceled ~ ., data = training, method = "knn", tuneGrid = data.frame(k = k))
+```
+
+
+XGBoost:
+
+The second method we consider is the popular and powerful 'XGBoost classifier'. XGBoost is an extension to gradients boosting decision trees. It's fast, because of it use of parallel and distributed computing, and accurate. Let's delve into this algorithm and apply it to our data. 
+
+In the following section we building the model in order to predict whether a customer would cancel their booking or not. We use the cross validation method to determine the optimal value for the hyperparameters. We pick the best model and we use this model to make predictions on the test data.
+
+
+```{r}
+set.seed(123)
+
+# Control scheme
+control <- trainControl(method = "cv", number = 5)
+
+# Tuning 
+tune_grid <- expand.grid(eta = c(0.1, 0.3), 
+                         max_depth = 1:2, colsample_bytree = 0.6, subsample = 1, 
+                         nrounds = c(100, 500), gamma = 0, min_child_weight = 1)
+
+# Fitting 
+xgboost_tuned <- train(is_canceled ~ ., data = training, method = "xgbTree", 
+                                   trControl = control, tuneGrid = tune_grid, verbose = FALSE, verbosity = 0)
+
+# Results
+xgboost_tuned
+```
+Now that we have these optimal hyperparameters we can use these in our final model. See the code for details.
+
+```{r}
+# Tuning the hyperparameters for the final model
+control <- trainControl(method = "none", number = 5)
+tune_grid <- expand.grid(nrounds = xgboost_tuned$bestTune$nrounds,
+                           eta = xgboost_tuned$bestTune$eta,
+                           max_depth = xgboost_tuned$bestTune$max_depth,
+                           gamma = xgboost_tuned$bestTune$gamma,
+                           colsample_bytree = xgboost_tuned$bestTune$colsample_bytree,
+                           min_child_weight = xgboost_tuned$bestTune$min_child_weight,
+                           subsample = xgboost_tuned$bestTune$subsample)
+
+# Fitting the final model
+xgb_model <- train(is_canceled ~ ., data = training, method = "xgbTree", 
+                   trControl = control, tuneGrid = tune_grid, verbose = FALSE)
+```
+
+
+
+
+3. Welke maten u gebruikt om de resultaten te beoordelen (en waarom).
+
+Let us consider both models and look at some metrics that give us insight into the performance of these models.
+KNN:
+In the following code we make a prediction using the KNN model on the training set. Furthermore, we examine the following performance metrics: accuracy, precision, sensitivity and specificity. 
+
+```{r}
+# We run a predict on the test data
+pred_knn <- predict(knn, test)
+
+# Confusion matrix and performance evaluation metrics
+conf_matrix_knn <- confusionMatrix(pred_knn, test$is_canceled)
+conf_matrix_knn
+```
+The confusion matrix presented above provides some interesting insight into the performance of the model. First off, we see an overall accuracy of 83%. In 83% of the cases the KNN model could accurately predict whether a booking would be cancelled or not. The sensitivity of the model is 89%. The sensitivity is also called the true positive rate. This means that KNN correctly identified whether a customer would not cancel the booking in 89% percent of the cases. The specificity of this model is 67% (True negative rate). In 67% of cases KNN could identify the cases where a customer would cancel his/her booking. Lastly, we look at the precision of the model. This entails the when the model predicted the 'positive' class, how accurate was it? The precision is 87%. The model was correct 87% of the time.
+
+XGBoost:
+
+```{r}
+# Predictions on the test data
+pred_xgb <- predict(xgb_model, test)
+
+# Confusion matrix with performance metrics
+conf.matrix_xgb <- confusionMatrix(pred_xgb, test$is_canceled)
+conf.matrix_xgb
+```
+The model is used to make predictions on the test data and the results are shown above in a confusion matrix. With an accuracy of 86% the XGBoost model outperforms KNN. In other words, the XGBoost model accurately predicts whether a booking is cancelled in 86% of cases, compared to 83% of KNN. Furthermore, the sensitivity of this model is close to 93%. It can accurately predict the 'positive class' (no) in 93% of cases and again outperforms the previous model. The specificity (true negative rate) and precision of the model are 70% and 89% respectively. The XGBoost model outperforms KNN across the board.
+
