@@ -149,7 +149,3 @@ sum(total_throughput$throughput)/60
 ```
 
 
-
-
-
-

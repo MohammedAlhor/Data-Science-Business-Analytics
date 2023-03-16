@@ -3,6 +3,7 @@ library(simmer)
 library(simmer.plot)
 library(dplyr)
 library(tidyverse)
+library(readxl)
 
 
 set.seed(42)
@@ -109,4 +110,5 @@ nrow(shipped_in_time)/nrow(total_throughput)*100
 # total runtime is as follows
 
 sum(total_throughput$throughput)/60
+
 
