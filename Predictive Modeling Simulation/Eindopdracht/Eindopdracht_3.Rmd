@@ -9,22 +9,364 @@ output: word_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+# Inladen van de benodigde libraries
+library(simmer)
+library(simmer.plot)
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(readxl)
+library(writexl)
+library(fitdistrplus)
+library(outliers)
 ```
 
-## Including Plots
+# 3. Now load the actual data into R and transform the data into an appropriate format for analysis using the scripts we will provide. Clean for outliers.Determine the average processing time for each phase (checking and admin) and determine the proportion of parcels sent out in time. Is the KPI target of 90% fulfilled?
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+set.seed(42)
+# inladen dataset
+setwd("~/Data-Science-Business-Analytics/Predictive Modeling Simulation/Eindopdracht")
+df <- read_excel('~/Data-Science-Business-Analytics/Data/parcel processing data clean-crossed pakketjes.xlsx', sheet = "Data", skip = 1) %>% 
+  drop_na()
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+# Sourcen van de functies die we later nodig hebben
+source("./compute_working_hours.R")
+```
+
+
+```{r}
+# In dit onderdeel berekenen we de duratie van verschillende activiteiten mbv de working hours functie
+data <- df %>%
+  mutate(check_time = working_hours(`Aangepast Begin checken`, `Eind checken`, saturday = FALSE),
+        admin_time = working_hours(`Begin admin`, `Eind admin`,saturday = FALSE),
+        throughput_time = working_hours(`Eind lossen`, `Eind admin`,saturday = FALSE),
+        min_eind_lossen = str_c(lubridate::date(min(df$`Eind lossen`)), " 07:00:00 UTC") %>% as.POSIXct(tz="utc"),
+        time_stamp = working_hours(min_eind_lossen, `Eind lossen`, saturday = FALSE),
+        check_time_waiting = working_hours(`Eind lossen`, `Aangepast Begin checken`, saturday = FALSE),
+        admin_time_waiting = working_hours(`Eind checken`, `Begin admin`, saturday = FALSE),
+        activity_time = check_time + admin_time) %>%
+  as.data.frame()
+# We vervangen de 0 waarden met de mean
+data <- data %>% 
+  mutate(
+    check_time = replace(check_time, check_time <= 0, mean(check_time)),
+    admin_time = replace(admin_time, admin_time <= 0, mean(admin_time))
+        )
+mean_check_time <- mean(data$check_time[data$check_time > 0])
+mean_admin_time <- mean(data$admin_time[data$admin_time > 0])
+mean_check_time
+mean_admin_time
+```
+
+
+Outlier analyse. De outliers worden opgespoord en in een vector gezet, deze wordt later gebruikt om die observaties te vervangen met het gemiddelde.
+
+```{r}
+# Check for outliers
+# Checking time
+outlier_values_1 <- boxplot.stats(data$check_time)$out  # outlier values.
+boxplot(data$check_time, main="Pressure Height", boxwex=0.2)
+mtext(paste("Outliers: ", paste(outlier_values_1, collapse=", ")), cex=0.6)
+outlier(data$check_time)
+check_time_outliers <-scores(data$check_time, type="z", prob=0.95) # logicals with cut-off
+```
+
+```{r}
+# Admin time
+outlier_values_2 <- boxplot.stats(data$admin_time)$out  # outlier values.
+boxplot(data$admin_time, main="Pressure Height", boxwex=0.2)
+mtext(paste("Outliers: ", paste(outlier_values_2, collapse=", ")), cex=0.6)
+outlier(data$admin_time)
+admin_time_outliers <-scores(data$admin_time, type="z", prob=0.95) # logicals with cut-off
+```
+
+Voor zowel checking time als admin time zien we outliers, deze worden vervangen door het gemiddele in het volgende code:
+```{r}
+# In dit onderdeel doen we wat data manipulatie, de waarden die kleiner of gelijk aan nul zijn worden vervangen door gemiddelden. Hetzelfde geldt voor de outliers.
+df_final <- data %>%
+  mutate(check_time = ifelse(check_time_outliers,mean_check_time, check_time),
+         admin_time = ifelse(admin_time_outliers,mean_admin_time, admin_time)) %>%
+  mutate(check_time    = ifelse(check_time <= 0, mean_check_time, check_time),
+         admin_time    = ifelse(admin_time <= 0, mean_admin_time, admin_time),
+         total_throughput = check_time + admin_time)
+```
+
+
+
+```{r}
+# Emperische verdeling & CDF
+plotdist(df_final$check_time, histo = TRUE, demp=TRUE)
+plotdist(df_final$admin_time, histo = TRUE, demp=TRUE)
+```
+
+Kijkende naar deze histogrammen, de empirical density en de CDF kunnen we wel stellen dat beide activiteiten niet normaal zijn verdeeld. Laten we een aantal verdelingen proberen en op zoek gaan naar degene met de beste fit. We bekijken de normale, weibull, gamma en de lognormale verdelingen. We doen dit eerst voor checking time.
+
+```{r}
+# Fit some other distributions
+fit_n  <-  fitdist(df_final$check_time, "norm")
+fit_w  <- fitdist(df_final$check_time,  "weibull")
+fit_g  <- fitdist(df_final$check_time,  "gamma")
+fit_ln <- fitdist(df_final$check_time,  "lnorm")
+```
+
+
+```{r}
+plot.legend <- c("Normal", "Weibull", "lognormal", "gamma")
+par(mfrow=c(2,2))
+denscomp(list(fit_n, fit_w, fit_g, fit_ln), legendtext = plot.legend)
+cdfcomp (list(fit_n, fit_w, fit_g, fit_ln), legendtext = plot.legend)
+qqcomp  (list(fit_n, fit_w, fit_g, fit_ln), legendtext = plot.legend)
+ppcomp  (list(fit_n, fit_w, fit_g, fit_ln), legendtext = plot.legend)
+```
+
+Aan de hand van deze grafieken kunnen we zien dat de normale verdeling geen hele goede fit heeft. Als we kijken naar de CDF lijken de Gamma, Weibull en Lognormale verdeling het 
+beste te passen. We checken vervolgens de Cullen and Frey graphs voor checking time, wellicht dat we visueel kunnen afleiden wat de beste verdeling is.
+
+```{r}
+descdist(df_final$check_time)
+descdist(df_final$check_time, boot = 1000)
+```
+
+Om een definitieve keuze te maken over de verdeling kunnen we kijken naar de AIC (Akaike Information Criterion). De laagste waaarde heeft de beste fit.
+
+```{r}
+print(c("AIC normal =",fit_n$aic))
+print(c("AIC weibull =",fit_w$aic))
+print(c("AIC gamma =",fit_g$aic))
+print(c("AIC lnorm =",fit_ln$aic))
+```
+De lognormale verdeling heeft voor checking time de laagste AIC en dus de beste fit. Deze zullen we in het volgende onderdeel gebruiken.
+
+In dit onderdeel doen we hetzelfde voor admin time. We gebruiken wederom dezelfde verdelingen als hiervoor.
+
+```{r}
+# Fit some other distributions
+fit_nn  <-  fitdist(df_final$admin_time, "norm")
+fit_ww  <- fitdist(df_final$admin_time,  "weibull")
+fit_gg  <- fitdist(df_final$admin_time,  "gamma")
+fit_lnn <- fitdist(df_final$admin_time,  "lnorm")
+```
+
+
+```{r}
+plot.legend <- c("Normal", "Weibull", "lognormal", "gamma")
+par(mfrow=c(2,2))
+denscomp(list(fit_nn, fit_ww, fit_gg, fit_lnn), legendtext = plot.legend)
+cdfcomp (list(fit_nn, fit_ww, fit_gg, fit_lnn), legendtext = plot.legend)
+qqcomp  (list(fit_nn, fit_ww, fit_gg, fit_lnn), legendtext = plot.legend)
+ppcomp  (list(fit_nn, fit_ww, fit_gg, fit_lnn), legendtext = plot.legend)
+```
+Wederom zien we dat de normale verdeling niet geschikt is voor deze data. De Gamma, Weibull en lognormale verdeling komen beter in de buurt. Laten we kijken naar de Cullen en Frey graphs.
+
+```{r}
+descdist(df_final$admin_time)
+descdist(df_final$admin_time, boot = 1000)
+```
+Voor checking time is de Cullen and Frey graph lastiger te interpreteren. Laten we dus wederom een blik werpen op de verschillende AIC waarden en op basis daarvan een keuze maken.
+
+```{r}
+print(c("AIC normal =",fit_nn$aic))
+print(c("AIC weibull =",fit_ww$aic))
+print(c("AIC gamma =",fit_gg$aic))
+print(c("AIC lnorm =",fit_lnn$aic))
+```
+De lognormale verdeling heeft de laagste AIC en dus de beste fit. Dit zullen we gebruiken in de volgende vraag waarin we de simulatie gaan doen. De parameters zijn als volgt:
+```{r}
+fit_lnn
+fit_ln
+```
+
+
+# 8. (3 points) Include the additional waiting time, as described above, in the simulation script. Then perform at least 100 simulation runs. How is the proportion of parcels sent out in time affected?
+
+Voordat we kunnen simuleren moeten we de 'additional' waiting time berekenen. Hiervoor hebben we de daadwerkelijke wachttijd en de empirische wachttijd voor nodig. De empirische wachttijd wordt opgehaald uit de volgende simulatie:
+```{r include=FALSE}
+# Arrival data gebaseerd op echte waarden.
+df_sim <- data %>%
+  arrange(time_stamp) %>%
+  dplyr::select(time_stamp)
+env_emp <- simmer("parcel depot empirical")
+
+parcel_emp <- trajectory("parcel's path") %>%
+  seize("express worker", 1) %>% # checking in of parcels by express worker
+  timeout(function() sample(df_final$check_time,1)) %>% # estimate and sd from fit_ln we previously estimated
+  release("express worker", 1) %>%
+  seize("admin worker", 1) %>% # preparing the parcel for shipping by admin worker
+  timeout(function() sample(df_final$admin_time,1)) %>% 
+  release("admin worker", 1)
+  
+
+set.seed(42)
+env_emp <- lapply(1:100, function(i) {
+  simmer("parcel depot empirical") %>%
+    add_resource("express worker", 1) %>%
+    add_resource("admin worker", 2) %>%
+    add_dataframe("parcel", parcel_emp, df_sim, col_time = "time_stamp", time="absolute") %>%
+    run(until=10*11)
+})
+```
+
+```{r}
+# Opslaan resulaten empirische simulatie
+result_emp <- env_emp %>%
+  get_mon_arrivals(per_resource = TRUE) %>%
+  transform(waiting_time = (end_time - start_time -activity_time),
+            activity_time = activity_time)
+actual_wait <- df_final$check_time_waiting[1:91]
+sim_wait    <- result_emp %>% dplyr::filter(resource == "express worker") %>% .$waiting_time %>% .[1:91]
+add_wait    <- actual_wait - sim_wait
+# Verwijderen van 0 waarden, waiting time mag geen 0 zijn
+add_wait_zero <- ifelse(add_wait <0, actual_wait, add_wait)
+hist(add_wait_zero, breaks = 100)
+
+# Fit some other distributions
+fit_wt_nn  <- fitdist(add_wait_zero, "norm")
+fit_wt_ww  <- fitdist(add_wait_zero,  "weibull")
+fit_wt_gg  <- fitdist(add_wait_zero,  "gamma")
+fit_wt_lnn <- fitdist(add_wait_zero,  "lnorm")
+
+
+```
+
+```{r}
+# Plotting
+plot.legend <- c("Normal", "Weibull", "lognormal", "gamma")
+par(mfrow=c(2,2))
+denscomp(list(fit_wt_nn, fit_wt_ww, fit_wt_gg, fit_wt_lnn), legendtext = plot.legend)
+cdfcomp (list(fit_wt_nn, fit_wt_ww, fit_wt_gg, fit_wt_lnn), legendtext = plot.legend)
+qqcomp  (list(fit_wt_nn, fit_wt_ww, fit_wt_gg, fit_wt_lnn), legendtext = plot.legend)
+ppcomp  (list(fit_wt_nn, fit_wt_ww, fit_wt_gg, fit_wt_lnn), legendtext = plot.legend)
+```
+
+```{r}
+# Print AIC's
+print(c("AIC normal =",fit_wt_nn$aic))
+print(c("AIC weibull =",fit_wt_ww$aic))
+print(c("AIC gamma =",fit_wt_gg$aic))
+print(c("AIC lnorm =",fit_wt_lnn$aic))
+```
+Nu we een verdeling hebben gekozen, in dit geval de gamma verdeling (laagste AIC), kunnen we gaan simuleren en bepalen wat voor impact deze teoevoeging heeft op het aantal pakketjes wat op tijd wordt verzonden.
+
+
+```{r echo=TRUE}
+# Arrival data gebaseerd op echte waarden.
+df_sim <- data %>%
+  arrange(time_stamp) %>%
+  dplyr::select(time_stamp)
+# opslaan van gamma verdeling
+wait_shape <- fit_wt_gg$estimate[1]
+wait_rate <- fit_wt_gg$estimate[2]
+
+env <- simmer("parcel depot")
+
+# Define process trajectory based on flow chart
+parcel <- trajectory("parcel' path") %>%
+  seize("wait time") %>%
+  timeout(function() rgamma(1, shape =wait_shape,rate =wait_rate)) %>%
+  release("wait time", 1) %>%
+  seize("express worker", 1) %>%
+  timeout(function() rlnorm(1, fit_ln$estimate, fit_ln$sd)) %>%
+  release("express worker", 1) %>%
+  seize("admin worker", 1) %>%    
+  timeout(function() rlnorm(1, fit_lnn$estimate, fit_lnn$sd)) %>%
+  release("admin worker", 1)
+
+set.seed(42) 
+env <- lapply(1:100, function(i) {
+  simmer("parcel depot") %>%
+    add_resource("wait time", capacity = Inf) %>%
+    add_resource("express worker", 1) %>%
+    add_resource("admin worker", 2) %>%
+    add_dataframe("parcel", parcel, df_sim, col_time = "time_stamp", time="absolute") %>%
+    run(until=10*11)
+})
+
+```
+
+```{r}
+# Get throughput of the process based on parcels
+result_arrival <- env %>%
+  get_mon_arrivals() %>%
+  mutate(throughput = (end_time - start_time))
+
+sum(result_arrival$throughput < 22) / length(result_arrival$throughput) # 22 uur voor de KPI
+
+```
+Het percentage pakketjes wat binnen de KPI worden verstuurd ligt nu op 85%, voorheen was dit 92% (zie resultaten vorige opdracht). Het aantal pakketjes wat binnen de afgesproken tijd worden vestuurd, als we 'additioanl wait time' mee modelleren, is dus met ongeveer 7 procent gedaald. 
+
+
+
+# 9. (2 points) Perform a sensitivity analysis on the number of express workers and the number of admin workers. Explain how these numbers affect the KPI target. Assume an express worker costs EUR 30 per hour and an admin worker costs EUR 35 per hour. How can the KPI target be achieved with the lowest possible costs?
+
+```{r echo=TRUE}
+expres_workers <- c(1,2,3,4,5,6,7,8,9,10)
+admin_workers <- c(1,2,3,4,5,6,7,8,9,10)
+
+sensitivity_results <- tibble(express = numeric(),
+                     admin = numeric(),
+                     ontime = numeric())
+
+for (a in expres_workers) {
+  for (i in admin_workers) {
+    print("calculating scenario for ")
+    print(a)
+    expres_workers <- a
+    print("Express and  ")
+    admin_workers <- i
+    print(i)
+    print("admin workers ")
+
+    env <- simmer("parcel depot")
+    
+    # Define process trajectory based on flow chart
+    parcel <- trajectory("parcel' path") %>%
+      seize("wait time") %>%
+      timeout(function() rgamma(1, shape =wait_shape,rate =wait_rate)) %>%
+      release("wait time", 1) %>%
+      seize("express worker", 1) %>%
+      timeout(function() rlnorm(1, fit_ln$estimate, fit_ln$sd)) %>%
+      release("express worker", 1) %>%
+      seize("admin worker", 1) %>%   
+      timeout(function() rlnorm(1, fit_lnn$estimate, fit_lnn$sd)) %>%
+      release("admin worker", 1)
+    
+    set.seed(42) 
+    env <- lapply(1:100, function(i) {
+      simmer("parcel depot") %>%
+        add_resource("wait time", capacity = Inf) %>%
+        add_resource("express worker", expres_workers) %>%
+        add_resource("admin worker", admin_workers) %>%
+        add_dataframe("parcel", parcel, df_sim, col_time = "time_stamp", time="absolute") %>%
+        run(until=10*11)
+    })
+
+    result_arrival <- env %>%
+      get_mon_arrivals() %>%
+      mutate(throughput = (end_time - start_time))
+
+    on_time <- sum(result_arrival$throughput < 22) / length(result_arrival$throughput)
+    print(on_time)
+    sensitivity_results <- sensitivity_results %>%
+      add_row(express =expres_workers,
+              admin = admin_workers,
+              ontime = on_time)
+
+  }
+}
+
+```
+```{r}
+sensitivity_results <- sensitivity_results %>%
+  mutate(express_costs = express * 30,
+         admin_costs = admin * 35,
+         total_costs = express_costs + admin_costs)
+sensitivity_results
+```
+
+In bovenstaand figuur worden de resultaten van de sensitivity analyse gevisualizeerd. Het is me niet gelukt om een combinatie express worker en admin worker te vinden waarbij de KPI wordt behaald. Nadat ik hier tevergeefs heel wat uren in heb gestop om het probleem te vinden heb ik besloten om deze resultaten toch te uploaden. Hoogst haalbare percentage is 85%.
+

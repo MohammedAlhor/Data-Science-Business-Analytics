@@ -29,10 +29,8 @@ library(outliers)
 set.seed(42)
 # inladen dataset
 setwd("~/Data-Science-Business-Analytics/Predictive Modeling Simulation/Eindopdracht")
-df <- read_excel(path = '~/Data-Science-Business-Analytics/Data/parcel processing data clean-crossed pakketjes.xlsx', 
-                 sheet = 'Data', 
-                 skip = 1) %>%
-                 drop_na()
+df <- read_excel('~/Data-Science-Business-Analytics/Data/parcel processing data clean-crossed pakketjes.xlsx', sheet = "Data", skip = 1) %>% 
+  drop_na()
 ```
 
 ```{r}
@@ -43,35 +41,29 @@ source("./compute_working_hours.R")
 
 ```{r}
 # In dit onderdeel berekenen we de duratie van verschillende activiteiten mbv de working hours functie
-data <- df %>% 
+data <- df %>%
   mutate(check_time = working_hours(`Aangepast Begin checken`, `Eind checken`, saturday = FALSE),
-         admin_time = working_hours(`Begin admin`, `Eind admin`, saturday = FALSE),
-         total_throughput = working_hours(`Eind lossen`, `Eind admin`, saturday = FALSE))
-
-summary(data$admin_time)
-summary(data$check_time)
-
+        admin_time = working_hours(`Begin admin`, `Eind admin`,saturday = FALSE),
+        throughput_time = working_hours(`Eind lossen`, `Eind admin`,saturday = FALSE),
+        min_eind_lossen = str_c(lubridate::date(min(df$`Eind lossen`)), " 07:00:00 UTC") %>% as.POSIXct(tz="utc"),
+        time_stamp = working_hours(min_eind_lossen, `Eind lossen`, saturday = FALSE),
+        check_time_waiting = working_hours(`Eind lossen`, `Aangepast Begin checken`, saturday = FALSE),
+        admin_time_waiting = working_hours(`Eind checken`, `Begin admin`, saturday = FALSE),
+        activity_time = check_time + admin_time) %>%
+  as.data.frame()
+# We vervangen de 0 waarden met de mean
+data <- data %>% 
+  mutate(
+    check_time = replace(check_time, check_time <= 0, mean(check_time)),
+    admin_time = replace(admin_time, admin_time <= 0, mean(admin_time))
+        )
 mean_check_time <- mean(data$check_time[data$check_time > 0])
 mean_admin_time <- mean(data$admin_time[data$admin_time > 0])
 mean_check_time
 mean_admin_time
 ```
 
-```{r}
-# In dit onderdeel berekenen we de duratie van verschillende activiteiten mbv de working hours functie
-data <- df %>% 
-  mutate(check_time = working_hours(`Aangepast Begin checken`, `Eind checken`, saturday = FALSE),
-         admin_time = working_hours(`Begin admin`, `Eind admin`, saturday = FALSE),
-         total_throughput = working_hours(`Eind lossen`, `Eind admin`, saturday = FALSE))
 
-summary(data$admin_time)
-summary(data$check_time)
-
-# In deze stap wordt de mean berekend van beide activiteiten, deze wordt later gebruikt om te imputen in de data
-mean_check_time <- mean(data$check_time[data$check_time > 0])
-mean_admin_time <- mean(data$admin_time[data$admin_time > 0])
-
-```
 Outlier analyse. De outliers worden opgespoord en in een vector gezet, deze wordt later gebruikt om die observaties te vervangen met het gemiddelde.
 
 ```{r}
@@ -240,28 +232,29 @@ fit_ln
 
 ```{r}
 env <- simmer("parcel depot")
-env
-lambda = 6
-rate = 1/lambda
+# Arrival data gebaseerd op echte waarden.
+df_sim <- data %>%
+  arrange(time_stamp) %>%
+  dplyr::select(time_stamp)
+
+
 parcel <- trajectory("parcel's path") %>%
   seize("express worker", 1) %>% # checking in of parcels by express worker
   timeout(function() rlnorm(1, fit_ln$estimate, fit_ln$sd)) %>% # estimate and sd from fit_ln we previously estimated
   release("express worker", 1) %>%
-  
   seize("admin worker", 1) %>% # preparing the parcel for shipping by admin worker
-  timeout(function() rlnorm(1, fit_lnn$estimate, fit_lnn$sd)) %>% # mean of 8 with sd of 2
+  timeout(function() rlnorm(1, fit_lnn$estimate, fit_lnn$sd)) %>% 
   release("admin worker", 1)
-
-env %>%
-  add_resource("express worker", 1) %>%
-  add_resource("admin worker", 2) %>%
-  add_generator("parcel", parcel, function() rexp(1, 1/6))
   
-# Dit is wat ik zelf heb geprobeerd, kunnen jullie me hier terugkoppeling over geven?  
-# add_dataframe('arrivals', parcel, data =  df_final, col_time = 'Eind lossen', time = 'interarrival')
-for (i in 1:100){
-  env %>% run(until=110) # we run the simulation for 110 hours (10 working days)
-}
+
+set.seed(42)
+env <- lapply(1:100, function(i) {
+  simmer("parcel depot") %>%
+    add_resource("express worker", 1) %>%
+    add_resource("admin worker", 2) %>%
+    add_dataframe("parcel", parcel, df_sim, col_time = "time_stamp", time="absolute") %>%
+    run(until=10*11)
+})
 
 env %>% get_mon_arrivals()
 env %>% get_mon_resources()
@@ -270,8 +263,8 @@ summary(get_mon_resources(env))
 plot(get_mon_resources(env))
 ```
 
+Tweede poging is het gelukt, met wat hulp van medestudenten. Datums worden verwerkt in een apart dataframe en vervolgens met behulp van 'add_dataframe' toegevoegd aan de simulatie. Laten we naar wat performance metrieken gaan kijken.
 
-Het is me helaas niet gelukt om met echte datums te werken voor de tijdsintervallen, zou hier graag feedback op willen ontvangen. Online kon ik moeilijk documentatie vinden voor het simmer package. Desalniettemin, gaan we wat performance metrics uit de vorige vragen berekenen. Laten we eerst kijken naar de checker.
 
 ```{r}
 env_per_user <- get_mon_arrivals(env, per_resource = TRUE)
@@ -324,39 +317,36 @@ print(c("SD total throughput  =",sd(total_throughput$throughput)))
 # 7. Now replace the statistical distributions in the simmer script with the empirical distributions. How do the different simulations compare?
 
 ```{r}
-env <- simmer("parcel depot")
-env
+env_emp <- simmer("parcel depot empirical")
 
-parcel <- trajectory("parcel's path") %>%
+parcel_emp <- trajectory("parcel's path") %>%
   seize("express worker", 1) %>% # checking in of parcels by express worker
-  timeout(function() rnorm(1, mean(df_final$check_time), sd(df_final$check_time))) %>% # empirical distributions
+  timeout(function() sample(df_final$check_time,1)) %>% # estimate and sd from fit_ln we previously estimated
   release("express worker", 1) %>%
-  
   seize("admin worker", 1) %>% # preparing the parcel for shipping by admin worker
-  timeout(rnorm(1, mean(df_final$admin_time), sd(df_final$admin_time))) %>% # mean of 8 with sd of 2
+  timeout(function() sample(df_final$admin_time,1)) %>% 
   release("admin worker", 1)
-
-env %>%
-  add_resource("express worker", 1) %>%
-  add_resource("admin worker", 2) %>%
-  add_generator("parcel", parcel, function() rexp(1, 1/6))
   
-# Dit is wat ik zelf heb geprobeerd, kunnen jullie me hier terugkoppeling over geven?  
-# add_dataframe('arrivals', parcel, data =  df_final, col_time = 'Eind lossen', time = 'interarrival')
-for (i in 1:100){
-  env %>% run(until=110) # we run the simulation for 110 hours (10 working days)
-}
 
-env %>% get_mon_arrivals()
-env %>% get_mon_resources()
+set.seed(42)
+env_emp <- lapply(1:100, function(i) {
+  simmer("parcel depot empirical") %>%
+    add_resource("express worker", 1) %>%
+    add_resource("admin worker", 2) %>%
+    add_dataframe("parcel", parcel_emp, df_sim, col_time = "time_stamp", time="absolute") %>%
+    run(until=10*11)
+})
 
-summary(get_mon_resources(env))
-plot(get_mon_resources(env))
+env_emp %>% get_mon_arrivals()
+env_emp %>% get_mon_resources()
+
+summary(get_mon_resources(env_emp))
+plot(get_mon_resources(env_emp))
 ```
 
 
 ```{r}
-env_per_user <- get_mon_arrivals(env, per_resource = TRUE)
+env_per_user <- get_mon_arrivals(env_emp, per_resource = TRUE)
 # We keep dividing by 60 to get the output in hours
 # Mean and standard deviation of checking time
 
