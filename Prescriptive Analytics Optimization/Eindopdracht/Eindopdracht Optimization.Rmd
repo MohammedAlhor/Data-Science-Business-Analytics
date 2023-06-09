@@ -1,0 +1,355 @@
+---
+title: "Eindopdracht Optimization"
+author: "Mohammed Al Hor"
+date: "2023-06-04"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exercise 1 MIP formulation
+
+# a. Formulate the problem as a mixed integer linear programming (MIP) model.
+
+Binary decision variables:
+- \(x_{ij}\): Indicates whether project \(i\) is assigned to employee \(j\).
+- \(y_{jk}\): Indicates whether project \(j\) is scheduled before project \(k\).
+
+Continuous decision variables:
+- \(e_j\): Tardiness of project \(j\).
+- \(t_j\): Finishing time of project \(j\).
+
+Objective function:
+\[
+\quad {Minimize: } \sum_{j=1}^n \text{weights}_j \cdot e_j
+\]
+
+Constraints:
+\[
+(1)\quad e_j \geq t_j - deadline_j, \quad for\ j = 1, 2, \ldots, n
+\]
+
+\[
+(2)\quad e_j \geq 0, \quad for\ j = 1, 2, \ldots, n
+\]
+
+\[
+(3)\quad t_j \geq \text{D}_{jk} \cdot y_{jk}, \quad for\ j = 1, 2, \ldots, n, \, k = 1, 2
+\]
+
+\[
+(4)\quad t_j \geq t_i + \text{D}_{jk} - \text{M} \cdot (3 - x_{ik} - (y_{ik} + y_{jk})), \quad for\ i, j = 1, 2, \ldots, n; \, i \neq j, \, k = 1, 2
+\]
+
+\[
+(5)\quad 1 = x_{ij} + x_{ji}, \quad for\ i, j = 1, 2, \ldots, n; \, i < j
+\]
+
+\[
+(6)\quad x_{ik} \geq x_{ij} + x_{jk} - 1, \quad for\ i, j, k = 1, 2, \ldots, n; \, i \neq j, \, i \neq k, \, j \neq k
+\]
+
+\[
+(7)\quad 1 = \sum_{k=1}^2 y_{jk}, \quad for\ j = 1, 2, \ldots, n
+\]
+
+\[
+(8)\quad x_{ij}, y_{jk} \in \{0, 1\}, \quad for\ i = 1, 2, \ldots, n; \, j = 1, 2; \, k = 1, 2
+\]
+
+
+Brief description of the constraints:
+
+(1): Tardiness must be greater than or equal to the difference between the finishing time and the deadline for each project j.
+
+(2): Tardiness must be non-negative for each project j.
+
+(3): The finishing time of project j must be greater than or equal to the duration of project j if it is scheduled before project k for each project j and k.
+
+(4): The finishing time of project j must be greater than or equal to the finishing time of project i plus the duration of project j if project i is directly 
+before j and assigned to the same employee, considering a large constant MM to enforce the condition.
+
+(5): If project i is scheduled before project j, then project j cannot be scheduled before project i.
+
+(6): Transitivity constraint that enforces the ordering of projects. If project i is scheduled before project j and project j is scheduled before project k, then project i must be scheduled before project k.
+
+(7): Each project j must be assigned to exactly one employee.
+
+(8): Ranges of the decision variables \(x_ij\)​ and \(y_ij\)​ as binary.  
+
+
+# b. Implement the model in R and solve the small instance with the Gurobi solver. Report the assignment and order of the projects, the finishing times, as well as the optimal objective value.
+
+```{r include=FALSE}
+rm(list = ls())
+suppressPackageStartupMessages(library(dplyr, quietly = TRUE)) 
+suppressPackageStartupMessages(library(ROI))
+library(magrittr)
+library(ompr)
+library(ompr.roi)
+library(ROI.plugin.gurobi)
+source("readInstance.R")
+source("printVector.R")
+```
+
+We run the gurobi solver with the formulation from the previous question. For the code, I refer you to the R-Markdown file submitted.
+```{r include=FALSE}
+# Setting parameters
+n=nProjects;   # number of projects
+p=2            # number of employees
+
+#BigM
+max_len <- max(sum(t(durations)[,1]),sum(t(durations)[,2]))
+min_len <- min(t(durations))
+bigM<-max_len-min_len
+
+#MIP model
+model <- MIPModel() %>%
+  
+  # Binary decision variables:
+  add_variable(x[i,j], i=1:n, j=1:n, type = "binary") %>%
+  add_variable(y[j,k], j=1:n, k=1:p, type = "binary") %>%
+  # Continuous decision variables:
+  add_variable(e[j], j=1:n, type = "continuous") %>%
+  add_variable(t[j], j=1:n, type = "continuous") %>%
+  
+  # Objective function:
+  set_objective(sum_over(weights[j]*e[j], j=1:n) 
+                  , "min") %>%
+  
+  # Constraints:
+  add_constraint(e[j]>=t[j]-deadlines[j], j = 1:n) %>%                                                                  # (1)
+  add_constraint(e[j]>=0, j=1:n) %>%                                                                                    # (2)
+  add_constraint(t[j]>=t(durations)[j,k]*y[j,k], j=1:n,k=1:p) %>%                                                       # (3)
+  add_constraint(t[j]>=t[i] + t(durations)[j,k] - bigM * (3-x[i,j]-(y[i,k]+y[j,k])),i = 1:n, j = 1:n, i!=j, k=1:p)  %>% # (4)
+  add_constraint(1==x[i,j]+x[j,i],i = 1:n, j = 1:n, i<j) %>%                                                            # (5)
+  add_constraint(x[i,l]>=x[i,j]+ x[j,l] - 1, i=1:n,j=1:n, l=1:n, i!=j, i!=l,j!=l) %>%                                   # (6)
+  add_constraint(1==sum_over(y[j,k],k=1:p), j = 1:n) %>%                                                                # (7)
+  # Setting the bounds
+  set_bounds(e[j], j=1:n, lb=0) %>%
+  set_bounds(t[j], j=1:n, lb=0)
+
+model
+
+# Solving model with Gurobi
+library("gurobi")
+params <- list(OutputFlag=1) 
+result <- solve_model(model, with_ROI(solver = "gurobi", params))
+sol_t=get_solution(result, t[j])
+sol_e=get_solution(result, e[j])
+sol_x=get_solution(result, x[i,j])
+sol_y=get_solution(result, y[j,k])
+```
+
+The results on the small data set are as follows:
+Assignment and order of projects:
+```{r echo=FALSE}
+printVector("Assignment of projects: ",sol_y$value,1,n)
+```
+Employee 1 takes on projects 6, 2, 10, 7 and 4.
+Employee 2 takes on projects 8, 1, 5, 9 and 3.
+
+Finishing time of projects:
+```{r echo=FALSE}
+printVector("Finishing time projects: ",sol_t$value,1,n)
+```
+The values above are in order beginning with project 1 and ending with project 10.
+
+
+```{r echo=FALSE}
+cat("\nOptimal objective value:",objective_value(result),'\n')
+```
+# c. Run the large instance for 10 minutes using the Gurobi solver. What is the best objective value found so far? What do you know about the optimality gap, i.e., how far is it from the optimal objective value?
+
+We run the gurobi solver with the formulation from the previous question for the large file. For the code, I refer you to the R-Markdown file submitted. For this part we source a different version of the readInstance.R file.
+```{r include=FALSE}
+source("readInstance_large.R")
+# Setting parameters
+n=nProjects;   # number of projects
+p=2            # number of employees
+
+#BigM
+max_len <- max(sum(t(durations)[,1]),sum(t(durations)[,2]))
+min_len <- min(t(durations))
+bigM<-max_len-min_len
+
+#MIP model
+model <- MIPModel() %>%
+  
+  # Binary decision variables:
+  add_variable(x[i,j], i=1:n, j=1:n, type = "binary") %>%
+  add_variable(y[j,k], j=1:n, k=1:p, type = "binary") %>%
+  # Continuous decision variables:
+  add_variable(e[j], j=1:n, type = "continuous") %>%
+  add_variable(t[j], j=1:n, type = "continuous") %>%
+  
+  # Objective function:
+  set_objective(sum_over(weights[j]*e[j], j=1:n) 
+                  , "min") %>%
+  
+  # Constraints:
+  add_constraint(e[j]>=t[j]-deadlines[j], j = 1:n) %>%                                                                  # (1)
+  add_constraint(e[j]>=0, j=1:n) %>%                                                                                    # (2)
+  add_constraint(t[j]>=t(durations)[j,k]*y[j,k], j=1:n,k=1:p) %>%                                                       # (3)
+  add_constraint(t[j]>=t[i] + t(durations)[j,k] - bigM * (3-x[i,j]-(y[i,k]+y[j,k])),i = 1:n, j = 1:n, i!=j, k=1:p)  %>% # (4)
+  add_constraint(1==x[i,j]+x[j,i],i = 1:n, j = 1:n, i<j) %>%                                                            # (5)
+  add_constraint(x[i,l]>=x[i,j]+ x[j,l] - 1, i=1:n,j=1:n, l=1:n, i!=j, i!=l,j!=l) %>%                                   # (6)
+  add_constraint(1==sum_over(y[j,k],k=1:p), j = 1:n) %>%                                                                # (7)
+  # Setting the bounds
+  set_bounds(e[j], j=1:n, lb=0) %>%
+  set_bounds(t[j], j=1:n, lb=0)
+
+model
+
+# Solving model with Gurobi
+library("gurobi")
+params <- list(OutputFlag=1, Timelimit = 10*60)
+result <- solve_model(model, with_ROI(solver = "gurobi", params))
+sol_t=get_solution(result, t[j])
+sol_e=get_solution(result, e[j])
+sol_x=get_solution(result, x[i,j])
+sol_y=get_solution(result, y[j,k])
+```
+
+See the following results for this run.
+```{r}
+#print output
+cat("\nBest objective value so far:",objective_value(result),'\n')
+printVector("Finishing time projects: ",sol_t$value,1,n)
+printVector("Tardiness: ",sol_e$value,1,n)
+printVector("Order of projects: ",sol_x$value,1,n)
+printVector("Assignment of projects: ",sol_y$value,1,n)
+```
+
+
+## Exercise 2 Multi-objective version
+
+# a. Formulate the problem with the second objective as a MIP and clearly explain any (additional) variables and constraints used.
+
+To incorporate the makespan calculation, we need to introduce a new decision variable C to represent the overall completion time. Here's the modified MIP formulation, including the additional constraint for the makespan calculation:
+
+Binary decision variables:
+- \(x_{ij}\): Indicates whether project \(i\) is assigned to employee \(j\).
+- \(y_{jk}\): Indicates whether project \(j\) is scheduled before project \(k\).
+
+Continuous decision variables:
+- \(e_j\): Tardiness of project \(j\).
+- \(t_j\): Finishing time of project \(j\).
+- \(C\)  : Overall largest completion time.
+
+Objective function:
+Minimize: \(\alpha \cdot \sum_{j=1}^n \text{weights}_j \cdot e_j + (1-\alpha) \cdot C\)
+
+Constraints:
+\[
+(1)\quad e_j \geq t_j - deadline_j, \quad for\ j = 1, 2, \ldots, n
+\]
+
+\[
+(2)\quad e_j \geq 0, \quad for\ j = 1, 2, \ldots, n
+\]
+
+\[
+(3)\quad t_j \geq \text{D}_{jk} \cdot y_{jk}, \quad for\ j = 1, 2, \ldots, n, \, k = 1, 2
+\]
+
+\[
+(4)\quad t_j \geq t_i + \text{D}_{jk} - \text{M} \cdot (3 - x_{ik} - (y_{ik} + y_{jk})), \quad for\ i, j = 1, 2, \ldots, n; \, i \neq j, \, k = 1, 2
+\]
+
+\[
+(5)\quad 1 = x_{ij} + x_{ji}, \quad for\ i, j = 1, 2, \ldots, n; \, i < j
+\]
+
+\[
+(6)\quad x_{ik} \geq x_{ij} + x_{jk} - 1, \quad for\ i, j, k = 1, 2, \ldots, n; \, i \neq j, \, i \neq k, \, j \neq k
+\]
+
+\[
+(7)\quad 1 = \sum_{k=1}^2 y_{jk}, \quad for\ j = 1, 2, \ldots, n
+\]
+
+\[
+(8)\quad x_{ij}, y_{jk} \in \{0, 1\}, \quad for\ i = 1, 2, \ldots, n; \, j = 1, 2; \, k = 1, 2
+\]
+\[
+(9)\quad C \geq t_j,\quad for\ j = 1, 2, \ldots, n
+\]
+
+\[
+(10)\quad C \geq 0
+\]
+
+The following updates have been made:
+Objective function:
+where \(\alpha\) is a parameter that determines the trade-off between the two objectives.
+
+(9) : This constraint ensures that the variable \(C\) is greater than or equal to each project's finishing time. 
+(10): This constraint sets a lower bound constraint on the variable \(C\). It must be greater or equal to 0.
+
+# b. We like to find some non-dominated points by the weighted sum method for the small instance. In particular, find the two non-dominated points corresponding to the weights λ = (0.95, 0.05) and λ = (0.05, 0.95).
+
+```{r include=FALSE}
+source("readInstance.R")
+# Setting parameters
+n=nProjects;   # number of projects
+p=2            # number of employees
+
+#BigM
+lambda1 <-c(0.95,0.05)
+lambda2 <-c(0.05,0.95)
+max_len <- max(sum(t(durations)[,1]),sum(t(durations)[,2]))
+min_len <- min(t(durations))
+bigM<-max_len-min_len
+
+#MIP model
+model <- MIPModel() %>%
+  
+  # Binary decision variables:
+  add_variable(x[i,j], i=1:n, j=1:n, type = "binary") %>%
+  add_variable(y[j,k], j=1:n, k=1:p, type = "binary") %>%
+  # Continuous decision variables:
+  add_variable(e[j], j=1:n, type = "continuous") %>%
+  add_variable(t[j], j=1:n, type = "continuous") %>%
+  add_variable(C, type = "continuous") %>%
+  # Updated objective function:
+  set_objective(lambda1[1]*sum_over(weights[j]*e[j], j=1:n) + lambda1[2] * C, "min") %>%
+  
+  # Constraints:
+  add_constraint(e[j]>=t[j]-deadlines[j], j = 1:n) %>%                                                                  # (1)
+  add_constraint(e[j]>=0, j=1:n) %>%                                                                                    # (2)
+  add_constraint(t[j]>=t(durations)[j,k]*y[j,k], j=1:n,k=1:p) %>%                                                       # (3)
+  add_constraint(t[j]>=t[i] + t(durations)[j,k] - bigM * (3-x[i,j]-(y[i,k]+y[j,k])),i = 1:n, j = 1:n, i!=j, k=1:p)  %>% # (4)
+  add_constraint(1==x[i,j]+x[j,i],i = 1:n, j = 1:n, i<j) %>%                                                            # (5)
+  add_constraint(x[i,l]>=x[i,j]+ x[j,l] - 1, i=1:n,j=1:n, l=1:n, i!=j, i!=l,j!=l) %>%                                   # (6)
+  add_constraint(1==sum_over(y[j,k],k=1:p), j = 1:n) %>%                                                                # (7)
+  add_constraint(C>=t[j], j=1:n) %>%
+  # Setting the bounds
+  set_bounds(e[j], j=1:n, lb=0) %>%
+  set_bounds(t[j], j=1:n, lb=0) %>%
+  set_bounds(C, lb=0)
+
+model
+
+# Solving model with Gurobi
+library("gurobi")
+params <- list(OutputFlag=1)
+result <- solve_model(model, with_ROI(solver = "gurobi", params))
+sol_t=get_solution(result, t[j])
+sol_e=get_solution(result, e[j])
+sol_x=get_solution(result, x[i,j])
+sol_y=get_solution(result, y[j,k])
+```
+
+```{r echo=FALSE}
+#print output
+cat("\nBest objective value so far:",objective_value(result),'\n')
+printVector("Finishing time projects: ",sol_t$value,1,n)
+printVector("Tardiness: ",sol_e$value,1,n)
+printVector("Order of projects: ",sol_x$value,1,n)
+printVector("Assignment of projects: ",sol_y$value,1,n)
+```
+
+

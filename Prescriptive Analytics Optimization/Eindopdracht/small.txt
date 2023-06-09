@@ -1,0 +1,13 @@
+- Number of jobs: 
+10
+- Parameters of the jobs (for each job: duration_1 duration2 deadline weight):
+8	3	6	5
+2	7	13	2
+10	11	13	1
+1	8	19	1
+4	3	16	4
+8	6	10	3
+6	9	18	1
+10	3	11	3
+12	10	19	4
+3	12	15	2
